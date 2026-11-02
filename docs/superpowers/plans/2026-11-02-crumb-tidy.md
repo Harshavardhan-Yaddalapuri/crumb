@@ -42,8 +42,8 @@
 - **No frames while the screen is locked.** RealityKit stops sending `SceneEvents.Update`, so a haul in progress pauses and resumes on unlock. For any visual check, the screen must be unlocked.
 - **Safety:**
   - Crumb only moves icons and never touches file contents here.
-  - Tests that move icons use throwaway files made by Finder (`crumb-probe*.txt`). Files made with `touch` on this iCloud desktop can't be trashed by Finder (-8013).
-  - Delete the probes afterwards by dragging them to the Trash.
+  - Tests that move icons use throwaway files made by Finder (`crumb-probe*.txt`). Files made with `touch` on this iCloud desktop can't be trashed by Finder (-8013); Finder-made ones sometimes can't either. Reuse an existing probe instead of making a new one (the commands below do).
+  - The human deletes the probes afterwards by dragging them to the Trash.
 
 ## File structure
 
@@ -522,7 +522,9 @@ Expected: `Build complete!` and nothing else.
 - [ ] **Step 3: Check it against the real Finder** with a throwaway harness outside the repo. It needs a file named `crumb-probe.txt` in the top-right desktop slot. Make one through Finder (not `touch`):
 
 ```bash
-osascript -e 'tell application "Finder" to set desktop position of (make new file at desktop with properties {name:"crumb-probe.txt"}) to {1854, 70}'
+osascript -e 'tell application "Finder"' \
+  -e 'if not (exists item "crumb-probe.txt" of desktop) then make new file at desktop with properties {name:"crumb-probe.txt"}' \
+  -e 'set desktop position of item "crumb-probe.txt" of desktop to {1854, 70}' -e 'end tell'
 ```
 
 Save this as `/tmp/fbcheck/main.swift`:
@@ -1309,7 +1311,9 @@ The screen must be unlocked for every step here.
 - [ ] **Step 1: Haul check with throwaway files (agent).** Make a gap: keep `crumb-probe.txt` from Task 3 in the top-right slot (make it again with the Task 3 command if it's gone), and add a second probe in row 4, leaving row 3 empty:
 
 ```bash
-osascript -e 'tell application "Finder" to set desktop position of (make new file at desktop with properties {name:"crumb-probe2.txt"}) to {1854, 406}'
+osascript -e 'tell application "Finder"' \
+  -e 'if not (exists item "crumb-probe2.txt" of desktop) then make new file at desktop with properties {name:"crumb-probe2.txt"}' \
+  -e 'set desktop position of item "crumb-probe2.txt" of desktop to {1854, 406}' -e 'end tell'
 osascript -e 'tell application "Finder" to return {name, desktop position} of every item of desktop'
 ```
 
