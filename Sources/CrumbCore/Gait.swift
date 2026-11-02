@@ -8,7 +8,7 @@ public struct Gait: Sendable {
     /// 0..<1 through the leg cycle.
     public private(set) var phase = 0.0
     /// +1 facing right, -1 facing left; the last horizontal direction walked.
-    public private(set) var facing = 1
+    public var facing = 1
     /// Points per second; jobs trot faster than strolls. The legs keep up because the cycle follows distance.
     public var pace = Gait.speed
 

@@ -100,16 +100,20 @@ final class Pet {
 
     /// Walks (at `pace`) until its mouth is over `p`, approaching from the side it's coming from.
     func walk(toHold p: CGPoint, pace: Double) async {
+        precondition(arrival == nil, "walk(toHold:) already pending")
         autopilot = false
         onJob = true
+        awakeSince = clock
         let side: Double = p.x >= gait.position.x ? 1 : -1
         gait.pace = pace
         gait.target = SIMD2(p.x - Self.hold.ahead * side, p.y + Self.hold.up)
         await withCheckedContinuation { arrival = $0 }  // resumed by update() once it stops
+        gait.facing = Int(side)  // face the icon even if the last steps went the other way
     }
 
     /// Holds a pose for a while.
     func perform(_ p: PoseName, for seconds: Double) async {
+        awakeSince = clock  // a job or complaint wakes it up
         goal = p
         try? await Task.sleep(for: .seconds(seconds))
     }

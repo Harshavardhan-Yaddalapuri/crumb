@@ -33,6 +33,7 @@ final class Bubble: NSView {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseDown(with event: NSEvent) {}  // clicks on the bubble shouldn't open the pet menu
 }
 
 /// NSButton that runs a closure. Takes the first click even though Crumb is never the active app.

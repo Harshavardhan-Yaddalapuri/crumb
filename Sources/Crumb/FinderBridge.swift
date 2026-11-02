@@ -59,6 +59,7 @@ final class FinderBridge: @unchecked Sendable {  // mutable state is only touche
     /// (anything off-screen), so only a read-back proves the move. Returns false if it didn't stick.
     func place(_ name: String, at p: CGPoint) async throws -> Bool {
         try await onQueue { [self] in
+            pendingDrag = nil  // a drag queued just before the drop must not run after it
             for _ in 0..<2 {
                 if Self.close(Self.point(try call("moveIcon", name, p)), p) { return true }
             }

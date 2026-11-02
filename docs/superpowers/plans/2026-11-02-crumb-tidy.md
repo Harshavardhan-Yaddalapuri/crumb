@@ -1371,3 +1371,12 @@ git commit -m "Spec: carry the real icon, verified moves, sorted-desktop handlin
   - Only Finder's default grid (64 / 54 / 12, labels below) is supported. The row count is fitted to one screen height.
   - Ad-hoc signing re-prompts for Automation after each rebuild. A stable self-signed identity would fix that if it gets annoying.
   - 24% CPU while rendering, as before.
+
+## Post-review fixes (applied after Tasks 1–6)
+
+- Snap to Grid (`arrangeBy = "grid"`) is allowed; `DesktopGrid` clamps wild positions and requires rows > 0; the row boundary test uses 1123/1124.
+- `place` drops any queued drag, so a stale drag can't move an icon after its verified drop.
+- `survey` ignores icons off the main screen, with unreadable positions, or with duplicate names.
+- A failed drop puts the icon back where it came from; that move is skipped until the desktop is tidy again (`failedMoves`).
+- After a pickup the puppy faces the icon (`Gait.facing` is settable); jobs and complaints reset the nap timer; a second pending walk is a precondition failure.
+- The complaint's sad pose doesn't interrupt a haul; clicking a bubble's background doesn't open the menu.

@@ -9,6 +9,7 @@ final class Hauler {
     static let trot = Gait.speed * 2.5
     /// Safety stop for one tidy, in case a plan never settles.
     static let maxHauls = 60
+    private static func key(_ m: Move) -> String { "\(m.id)→\(m.to.col),\(m.to.row)" }
 
     private let finder: FinderBridge
     private let overlay: PetOverlay
@@ -16,6 +17,7 @@ final class Hauler {
     private let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
     private var running = false
     private var again = false
+    private var failedMoves: Set<String> = []  // moves whose drop didn't stick; skipped until the desktop is tidy
     /// The complaint currently shown, so each problem is said once rather than on every check.
     private var complaint: String?
     private var retry: Task<Void, Never>?
@@ -51,10 +53,15 @@ final class Hauler {
         while again, hauls < Self.maxHauls {
             again = false
             guard let icons = await survey() else { break }
-            guard let move = planMoves(icons.map(\.icon), rows: grid.rows, sort: sort).first else { continue }
+            let moves = planMoves(icons.map(\.icon), rows: grid.rows, sort: sort)
+            if moves.isEmpty { failedMoves.removeAll() }
+            guard let move = moves.first(where: { !failedMoves.contains(Self.key($0)) }) else { continue }
             let from = icons.first { $0.icon.id == move.id }!.position
             hauls += 1
-            guard await haul(move.id, from: from, to: grid.center(of: move.to)) else { break }
+            guard await haul(move.id, from: from, to: grid.center(of: move.to)) else {
+                failedMoves.insert(Self.key(move))
+                break
+            }
             again = true  // re-plan from fresh positions
         }
         if pet.onJob { pet.goHome() }
@@ -68,6 +75,7 @@ final class Hauler {
         await pet.walk(toHold: to, pace: Self.trot)
         pet.onHold = nil
         let placed = (try? await finder.place(name, at: to)) ?? false
+        if !placed { _ = try? await finder.place(name, at: from) }  // put it back rather than leave it mid-carry
         await pet.perform(placed ? .stand : .shrug, for: placed ? 0.2 : 1.2)
         return placed
     }
@@ -100,7 +108,11 @@ final class Hauler {
             return complain("I can't see your desktop icons. Is Stage Manager hiding them?")
         }
         dismissComplaint()
-        return found.map { item in
+        // Only icons on this screen with a readable position and a unique name; others are left alone.
+        let screen = CGRect(x: 0, y: 0, width: overlay.pet.map.width, height: overlay.pet.map.height)
+        let names = Dictionary(grouping: found, by: \.name)
+        let usable = found.filter { screen.contains($0.position) && names[$0.name]?.count == 1 }
+        return usable.map { item in
             // Finder shows ":" in file names as "/".
             let url = desktop.appendingPathComponent(item.name.replacingOccurrences(of: "/", with: ":"))
             let added = (try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate
@@ -124,6 +136,7 @@ final class Hauler {
         complaint = text
         overlay.say(text, buttons: (button.map { [$0] } ?? []) + [("OK", { [weak overlay] in overlay?.say(nil) })])
         Task {
+            guard !pet.onJob else { return }  // don't interrupt a haul
             pet.autopilot = false
             await pet.perform(.sad, for: 3)
             if !pet.onJob { pet.autopilot = true }
