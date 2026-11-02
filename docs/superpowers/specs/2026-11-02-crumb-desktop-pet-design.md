@@ -32,23 +32,30 @@ Pet: round creature, ~64pt, lives along the bottom edge of the desktop above the
 | Sniff | Junk candidate found | Walks to file, sniffs, "?" appears |
 | Ask | After Sniff | Bubble: "Eat `<filename>`?" with **Yum** / **Keep** / **Never ask about this** |
 | Eat (Bite 1–3) | Yum | Takes 2 bites if the file is < 1 MB, otherwise 3. Each bite removes a chunk from the icon sprite with a crumb-particle burst; ~0.4 s per bite |
-| Full | After last bite | Belly bulges, slow waddle, pats tummy |
-| Digest nap | After hauling to close the eaten file's gap | Curls up, "zzz", belly visibly shrinks over 15 min |
-| Burp | Digestion complete | Small burp; files move to Trash at this moment |
+| Fullness (1–5) | Belly holds 1–5 digesting files | Belly roundness scales with count; at 5 it's stuffed: slow waddle, pats tummy |
+| Digest nap | Belly reaches 5/5 (after hauling to close the last gap) | Curls up, "zzz"; wakes as soon as a slot frees |
+| Burp | A file's own 15-min digest timer ends | Small burp, belly shrinks one step; that file moves to Trash at this moment |
 | Spit out | Undo (click sleeping pet → "Spit it out", or from Belly history) | Coughs the file back to its original position |
 | Burrow | Stale file found in Downloads | Hops into Dock's Downloads stack, pops out dragging the file, then Sniff → Ask on the desktop |
 | Shrug | A job fails or is skipped | Shrug animation, optional short bubble |
 | Sad | Finder automation permission missing | Sad face, bubble "I need permission to tidy" with button to System Settings |
 
-Eat sequence: Yum → Bite ×2–3 → Full → Haul (close gap) → Digest nap (15 min) → Burp → Trash.
+Eat sequence: Yum → Bite ×2–3 → belly grows one step → Haul (close gap) → back to Idle (or Digest nap if belly is 5/5). Independently, 15 min after that file was eaten → Burp → Trash.
+
+Digestion model:
+- Belly capacity: **5 files** (constant `bellyCapacity = 5`).
+- Each file gets its own 15-min digest timer, started the moment it's eaten. Timers run regardless of fullness or nap.
+- The pet is hungry (may Ask/eat) whenever fewer than 5 files are digesting. Example: eats 3 at 0:00, nothing else → all 3 burp at 0:15, belly empty.
+- At 5/5 it naps; it wakes as soon as the oldest file burps and a slot frees.
+- Files whose timers end within the same few seconds burp together in one Burp.
 
 Bite masks: three pre-drawn "bitten" alpha masks applied in order to the icon snapshot (bite 1, bite 2, gone). Two-bite variant uses masks 1 and 3.
 
 Anti-annoyance rules:
-- At most one Ask per 15 minutes (manual "Clean up now" bypasses this).
+- At most one Ask per 15 minutes while wandering.
+- "Clean up now" bypasses that limit and Asks back-to-back until the belly is 5/5 or no candidates remain; then it naps.
 - Silent while a full-screen app is frontmost or a Focus mode is on.
 - No Asks during Digest nap; new haul/arrange jobs queue until it wakes.
-- Several files eaten in one sweep share one 15-minute digest timer.
 - **Keep** = never ask about that file again.
 
 Pet menu (click pet): Clean up now · Sort by ▸ (Kind / Date / Name / Off) · Belly (history + undo) · Nap for 1h · Settings.
@@ -94,7 +101,7 @@ File removed from Desktop:
 Eating:
 1. JunkRules flags file → PetBrain queues Sniff/Ask.
 2. On Yum: PetBrain re-validates the file (exists, unchanged), PetOverlay plays bites; on final bite Belly moves the file into the staging folder and records it.
-3. Full → Haul to close the gap → Digest nap. After 15 min, Burp: Belly moves all digesting files to Trash.
+3. Belly records `eatenAt` per file; PetBrain hauls to close the gap, then Idles (or naps at 5/5). Belly fires a Burp for each file when `now − eatenAt ≥ 15 min` and moves it to Trash.
 
 Undo:
 - During digestion: Belly moves file from staging back to its original path; FinderBridge restores its desktop position.
@@ -125,6 +132,6 @@ FinderBridge's ability to set desktop icon positions reliably on current macOS i
 
 - JunkRules: table-driven unit tests (name, age, tags, size → expected verdict). Primary file-safety gate.
 - GapPlanner: unit tests on grids with holes and each sort mode.
-- Belly: eat → digest → Trash, spit out mid-digest, crash-recovery sweep; run against a temp directory.
+- Belly: eat → digest → Trash, per-file timers (eat 3 at t=0 and 1 at t=10 → 3 burp at t=15, 1 at t=25), capacity cap at 5, spit out mid-digest, crash-recovery sweep; run against a temp directory with an injectable clock.
 - FinderBridge: manual verification on real macOS (the spike).
 - Animations: visual check; no automated UI tests in v1.
