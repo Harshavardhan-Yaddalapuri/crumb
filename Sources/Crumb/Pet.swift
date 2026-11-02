@@ -1,8 +1,8 @@
 import CrumbCore
 import Foundation
 
-/// Per-frame puppy behaviour. Idle life (sitting, looking around, wagging, short strolls near the Dock, naps)
-/// is decided here for now; Plan 3's PetBrain adds the jobs.
+/// Per-frame puppy behaviour: idle life (sitting, looking around, wagging, short strolls near the Dock, naps)
+/// plus the moves jobs need (`walk(toHold:)`, `perform`, carrying through `onHold`).
 @MainActor
 final class Pet {
     let rig: PuppetRig
@@ -12,8 +12,13 @@ final class Pet {
     var gait: Gait
     /// The pose it is easing toward while standing still.
     var goal = PoseName.stand
-    /// false freezes wander decisions and idle extras (snapshot mode, and later PetBrain).
+    /// false freezes wander decisions and idle extras (snapshot mode, jobs, complaints).
     var autopilot = true
+    /// On a job it keeps facing the way it walks instead of turning to the viewer when it stops.
+    private(set) var onJob = false
+    /// While set, called every frame with the screen point a carried icon should be at.
+    var onHold: ((CGPoint) -> Void)?
+    private var arrival: CheckedContinuation<Void, Never>?
 
     private var pose = Pose()
     private var yaw: Float = 0
@@ -34,6 +39,9 @@ final class Pet {
 
     /// The model is about 0.92 m wide and 1.2 m tall with its feet at the origin.
     static let size = (width: 0.92, height: 1.2)
+    /// Where a carried icon's centre sits relative to the feet, in points, when facing right (x flips when facing left).
+    /// Ahead of the snout so the head doesn't hide it: the real icon is drawn by Finder, under the puppy.
+    static let hold = (ahead: 58.0, up: 52.0)
 
     init(rig: PuppetRig, map: ScreenMap, groundY: Double) {
         self.rig = rig
@@ -55,11 +63,16 @@ final class Pet {
         if wasWalking, !gait.isWalking { nextDecision = clock + .random(in: 3...6) }
         wasWalking = gait.isWalking
         if autopilot, !gait.isWalking, clock >= nextDecision { wander() }
+        if !gait.isWalking, let done = arrival {
+            arrival = nil
+            done.resume()
+        }
 
         let ease = { (rate: Double) in Float(1 - exp(-dt * rate)) }
-        pose = Pose.mix(pose, gait.isWalking ? PoseName.stand.pose : goal.pose, ease(6))
-        // Three-quarter view while walking, face the viewer when still.
-        yaw += ((gait.isWalking ? Float(gait.facing) * 0.6 : 0) - yaw) * ease(8)
+        let walkPose = onHold == nil ? PoseName.stand : .carry
+        pose = Pose.mix(pose, gait.isWalking ? walkPose.pose : goal.pose, ease(6))
+        // Three-quarter view while walking (and all through a job), face the viewer when still.
+        yaw += ((gait.isWalking || onJob ? Float(gait.facing) * 0.6 : 0) - yaw) * ease(8)
         stepAmount += ((gait.isWalking ? 0.45 : 0) - stepAmount) * ease(10)
         ears.step(toward: gait.isWalking ? 0.35 : 0, dt: dt)
 
@@ -77,6 +90,39 @@ final class Pet {
             breath: 0.015 * sin(Float(clock) * 2.2))
         let feet = map.world(CGPoint(x: gait.position.x, y: gait.position.y))
         rig.entity.position = SIMD3(feet.x, feet.y, 0)
+        if let onHold {
+            let turn = Double(sin(yaw) / sin(0.6))  // -1 facing left ... 1 facing right, smooth while it turns
+            onHold(CGPoint(x: gait.position.x + Self.hold.ahead * turn, y: gait.position.y - Self.hold.up))
+        }
+    }
+
+    // MARK: - Jobs
+
+    /// Walks (at `pace`) until its mouth is over `p`, approaching from the side it's coming from.
+    func walk(toHold p: CGPoint, pace: Double) async {
+        autopilot = false
+        onJob = true
+        let side: Double = p.x >= gait.position.x ? 1 : -1
+        gait.pace = pace
+        gait.target = SIMD2(p.x - Self.hold.ahead * side, p.y + Self.hold.up)
+        await withCheckedContinuation { arrival = $0 }  // resumed by update() once it stops
+    }
+
+    /// Holds a pose for a while.
+    func perform(_ p: PoseName, for seconds: Double) async {
+        goal = p
+        try? await Task.sleep(for: .seconds(seconds))
+    }
+
+    /// Job done: stroll back to the Dock line and go back to idle life.
+    func goHome() {
+        onJob = false
+        onHold = nil
+        goal = .stand
+        gait.pace = Gait.speed
+        let band = Self.strollBand.lowerBound * map.width...Self.strollBand.upperBound * map.width
+        gait.target = SIMD2(min(max(gait.position.x, band.lowerBound), band.upperBound), groundY)
+        autopilot = true
     }
 
     /// Idle life on top of the pose: glance left and right, wag in bursts. Still while walking or asleep.
