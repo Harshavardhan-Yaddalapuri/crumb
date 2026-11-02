@@ -29,7 +29,8 @@
 - **The code here was built and run before the plan was written.**
   - All 11 tests pass.
   - `FinderBridge` was run against the real Finder: read, place with read-back, a refused off-screen move, and an injection attempt that was safely rejected.
-  - The haul path ran up to the first walk. The full end-to-end haul and the new pose snapshots weren't checked, because the Mac's screen locked and RealityKit renders no frames while it's locked. Task 7 checks them.
+  - A full haul was run on the real desktop: `crumb-probe2.txt` was carried from slot 4 to slot 3 (`1854, 294`) and the user's PDF wasn't touched.
+  - The `shrug` and `sad` snapshots were checked by eye.
 - **Tests need Xcode** (`xcode-select -p` → `/Applications/Xcode.app/Contents/Developer`). "Red" means a compile error or a failed `#expect`. Keep one `@Test` per test file.
 - **Finder facts found while writing this plan:**
   - `{name, desktop position} of every item of desktop` returns everything in one call, in about 0.1 s.
