@@ -30,7 +30,7 @@ Art and animation: jointed 3D puppet rendered with RealityKit through an orthogr
 | State | Trigger | Visual |
 |---|---|---|
 | Idle / Wander | Default | Mostly sits and watches you: glances left and right, wags in bursts, blinks; now and then a short stroll over the middle of the screen (where the Dock is); naps after 10 min of no activity |
-| Haul | Gap appears or sort preset applied | Walks to icon, grabs it, drags it to its new spot |
+| Haul | Gap appears or sort preset applied | Trots to the icon, picks it up, and carries the real icon (Finder moves it along ~20×/s) to its new spot; strolls back to the Dock after |
 | Sniff | Junk candidate found | Walks to file, sniffs, "?" appears |
 | Ask | After Sniff | Bubble: "Eat `<filename>`?" with **Yum** / **Keep** / **Never ask about this** |
 | Eat (Bite 1–N) | Yum | N = round(1 + 2 × log10(sizeMB + 1)), clamped to 1…10 (e.g. 2.4 MB → 2, 45 MB → 4, 180 MB → 6, 1.4 GB → 7). Each bite removes a chunk from the icon sprite, sweeping left to right, with a crumb-particle burst; ~0.5 s per bite (0.35 s when N > 5) |
@@ -90,7 +90,7 @@ Native Swift app, AppKit + RealityKit, no third-party dependencies.
 | PetBrain | State machine + job queue (Haul, Sniff/Ask/Eat, Burrow, Spit out); enforces anti-annoyance rules and digest timer | Swift |
 | FolderWatcher | Emits added/removed/renamed events for Desktop and Downloads | FSEvents |
 | JunkRules | Pure function: file metadata → `junk(reason)` or `keep` | Swift, Spotlight metadata |
-| FinderBridge | Only component that talks to Finder: read all desktop icon positions, set one icon's position, read grid spacing/icon size | Apple Events via `NSAppleScript` |
+| FinderBridge | Only component that talks to Finder: read all desktop icons and positions in one call, place an icon and read it back, stream an icon along while carried; reads Finder's layout prefs | Apple Events via `NSAppleScript` |
 | GapPlanner | Pure function: current positions + grid + sort mode → ordered list of moves preserving reading order | Swift |
 | Belly | Holds eaten files in `~/Library/Application Support/Crumb/Belly/` during digestion, moves to Trash on Burp, keeps undo history (original path, original desktop position, current location) as JSON | `FileManager`, `NSWorkspace.recycle` |
 
@@ -99,7 +99,7 @@ Native Swift app, AppKit + RealityKit, no third-party dependencies.
 File removed from Desktop:
 1. FolderWatcher → `removed(file)`.
 2. PetBrain asks FinderBridge for positions → GapPlanner returns moves.
-3. One Haul job per move. PetOverlay snapshots the icon, plays walk/grab/drag; at drop, FinderBridge sets the real position and verifies it; sprite fades into the real icon.
+3. Hauler plans the moves and hauls one at a time: the puppy walks to the icon, bites, and carries the real icon while FinderBridge moves it along; at the drop FinderBridge places it and reads it back. After each haul it re-plans from fresh positions.
 
 Eating:
 1. JunkRules flags file → PetBrain queues Sniff/Ask.
@@ -117,7 +117,7 @@ Undo:
 
 ### Risk and spike
 
-FinderBridge's ability to set desktop icon positions reliably on current macOS is the core risk. First task is a 2-day spike proving set-and-verify works. Fallback if it fails: set Finder's desktop arrangement ("Sort By") via Apple Events and keep the pet's animation as the visual layer.
+Resolved: the spike (spike/FINDINGS.md) showed per-icon positioning works and reads back exactly. Off-screen positions are silently ignored, so every move is verified by reading back.
 
 ## 4. Error handling
 
@@ -130,6 +130,8 @@ FinderBridge's ability to set desktop icon positions reliably on current macOS i
 | App quit/crash mid-digest | On launch, Belly sweeps staging: files held ≥ 15 min → Trash; younger resume countdown. |
 | Icons rearranged mid-haul | Remaining hauls re-planned from fresh positions. |
 | Desktop icons hidden (Finder setting / Stage Manager) | Pet wanders; hauling paused until icons visible. |
+| Finder is sorting the desktop (Sort By / stacks) | Sad face, bubble asking to set Sort By to None; hauling paused, rechecked every minute. |
+| Icon size / spacing other than Finder's defaults | Bubble: leaves icons alone (grid not measured yet); v2 measures other grids. |
 
 ## 5. Testing
 
