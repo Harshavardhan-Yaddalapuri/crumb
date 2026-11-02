@@ -43,3 +43,13 @@ Measured with 18 temp files + `clean up window of desktop by name` (1920×1080, 
 3. **Automation permission is per calling app.** Terminal was granted here; the Crumb app will trigger its own "wants to control Finder" prompt.
 4. The Desktop is synced to iCloud Drive on this Mac (`~/Library/Mobile Documents/com~apple~CloudDocs/Desktop` → `~/Desktop`). Moving files from there into Belly's staging folder is untested; see 5.
 5. **iCloud "needs to be downloaded" (-8013).** Finder refused to trash `crumb-spike.txt` (an empty file made with `touch`): "The operation can't be completed because the item needs to be downloaded." 18 files made through Finder trashed fine. With iCloud Desktop, a file may not be local, so Belly's move to staging can fail. Plan 2: check `URLResourceValues.ubiquitousItemDownloadingStatus`; if it isn't `.current`, skip it (or start a download and retry later). Never treat a failed move as eaten; spec §4 already says spit out + "Couldn't eat that one." 
+
+## Plan 3 additions (2026-11-02)
+
+- Bulk read: `{name, desktop position} of every item of desktop` returns everything in one call, about 0.1 s (0.12 s for the first call in a process).
+- In-process moves take about 6 ms (11 ms when the script is re-created each time), so Crumb carries the **real** icon by moving it about 20×/s and never draws a copy.
+- **Off-screen positions are silently ignored** (`-300,-300` and `2400,500` leave the icon where it was, with no error). Always read back.
+- **`NSAppleScript` must be compiled on the main thread.** Compiled on a background thread while the main run loop runs, the first Finder call hangs forever. Compiled on main, it executes fine on a background queue.
+- Finder's and Stage Manager's prefs can be read via `UserDefaults(suiteName:)` without permission. `HideDesktop = 1` with Stage Manager off doesn't hide icons. Crumb therefore detects hidden icons empirically: Finder reports no items while `~/Desktop` has files.
+- Finder shows `:` in file names as `/`. Convert back before building a path.
+- RealityKit sends no frame updates while the screen is locked, so a job in progress pauses until unlock.
