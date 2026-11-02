@@ -23,9 +23,9 @@ Multi-display support (pet stays on main display), custom arrangement zones, AI-
 
 ## 1. Character and behaviors
 
-Pet: original cartoon puppy (orange fur, cream snout and paws, floppy dark ears, blue collar), ~110×92pt, side view, lives along the bottom edge of the desktop above the Dock. Carries icons in its mouth when hauling.
+Pet: original chibi black puppy (glossy black fur, big eyes, floppy ears, orange collar with a gold tag, cream bib), about 110 pt tall, a 3D model built by `art/build_crumb.py` (Blender) and exported to `art/crumb.usdz`. Faces the viewer when idle or asking; turns three-quarter toward where it walks. Lives along the bottom edge of the desktop above the Dock. Carries icons in its mouth when hauling.
 
-Art and animation: cut-out (skeletal) puppet. Parts: body, head, near/far ear, tail, four legs, mouth open/closed, eyes open/closed. Each part has a pivot; a per-frame loop blends between poses (stand, sit with head tilt, sniff, bite, carry, sleep, burp), drives a distance-locked walk cycle (no foot sliding), eased moves, a spring on the ears, tail wag, breathing, and fullness scaling. Implemented in one `PetSprite` file with SpriteKit nodes; hand-illustrated parts can replace the shapes later without changing the skeleton. Reference prototype: https://claude.ai/artifact/KVNPRyusCCgmBSdUjHGoyj
+Art and animation: jointed 3D puppet rendered with RealityKit through an orthographic camera (1 m = 92 pt), so the nose can be placed on an exact screen point. Joints: BodyPivot, HeadPivot, JawPivot, TailPivot, EarL/R, EyeL/R, four legs. `PuppetRig` sets them from a `Pose` (stand, sit with head tilt, sniff, bite, carry, sleep, burp); `Pet` blends poses, drives a distance-locked walk cycle (no foot sliding), a spring on the ears, blinking and breathing. Reshaping the model in Blender doesn't change code as long as the pivot names stay.
 
 | State | Trigger | Visual |
 |---|---|---|
@@ -81,11 +81,12 @@ Deterministic rules only. Each rule is togglable in Settings.
 
 ## 3. Architecture
 
-Native Swift app, AppKit + SpriteKit, no third-party dependencies.
+Native Swift app, AppKit + RealityKit, no third-party dependencies.
 
 | Component | Responsibility | Built on |
 |---|---|---|
-| PetOverlay | Borderless transparent window over the main display, level just above desktop icons; click-through except pet and bubble; renders pet and carried/bitten icon sprites | AppKit `NSWindow`, SpriteKit |
+| PetOverlay | Borderless transparent window over the main display, level just above desktop icons; click-through except pet and bubble; renders pet and carried/bitten icon sprites | AppKit `NSWindow`, RealityKit `ARView` |
+| PuppetRig + Pet | Map poses, walk, ears and blinks onto the USDZ joints each frame | RealityKit, CrumbCore `Pose`/`Gait`/`Spring`/`ScreenMap` |
 | PetBrain | State machine + job queue (Haul, Sniff/Ask/Eat, Burrow, Spit out); enforces anti-annoyance rules and digest timer | Swift |
 | FolderWatcher | Emits added/removed/renamed events for Desktop and Downloads | FSEvents |
 | JunkRules | Pure function: file metadata → `junk(reason)` or `keep` | Swift, Spotlight metadata |
