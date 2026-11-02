@@ -93,6 +93,8 @@ final class PetOverlay {
 
 /// Shows the pet menu on click.
 final class PetView: ARView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }  // Crumb is never the active app; the first click should open the menu
+
     override func mouseDown(with event: NSEvent) {
         if let menu { NSMenu.popUpContextMenu(menu, with: event, for: self) }
     }

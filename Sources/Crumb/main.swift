@@ -11,12 +11,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // Inside Crumb.app the model is a bundle resource; `swift run Crumb` from the repo root finds it in art/.
                 let url = Bundle.main.url(forResource: "crumb", withExtension: "usdz")
                     ?? URL(fileURLWithPath: "art/crumb.usdz")
-                let overlay = try PetOverlay(screen: NSScreen.main!, model: try await Entity(contentsOf: url))
+                let overlay = try PetOverlay(screen: NSScreen.screens[0], model: try await Entity(contentsOf: url))  // the menu-bar display; NSScreen.main follows keyboard focus
                 self.overlay = overlay
                 if let dir = ProcessInfo.processInfo.environment["CRUMB_SNAPSHOT"] {
                     try await overlay.snapshotPoses(to: URL(fileURLWithPath: dir))
                 }
             } catch {
+                NSApp.activate()
                 NSAlert(error: error).runModal()
                 NSApp.terminate(nil)
             }

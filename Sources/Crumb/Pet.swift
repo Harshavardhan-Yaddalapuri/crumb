@@ -83,6 +83,7 @@ final class Pet {
 
     /// Snap straight to a pose (snapshot mode). "walk" starts a stroll to the right instead.
     func show(_ name: String) {
+        nextBlink = .infinity  // snapshots stay repeatable: no blink mid-capture
         if let p = PoseName(rawValue: name) {
             gait.target = gait.position
             goal = p
