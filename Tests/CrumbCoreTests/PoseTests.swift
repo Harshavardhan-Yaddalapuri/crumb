@@ -11,4 +11,5 @@ import Testing
     #expect(Set(PoseName.allCases.map(\.pose)).count == PoseName.allCases.count, "every pose is distinct")
     #expect(PoseName.bite.pose.jaw > PoseName.carry.pose.jaw, "biting opens wider than carrying")
     #expect(Mirror(reflecting: Pose()).children.count == Pose.joints.count, "mix covers every joint")
+    #expect(PoseName.sad.pose.headPitch > 0 && PoseName.shrug.pose.headTilt != 0, "sad hangs its head, shrug tilts it")
 }

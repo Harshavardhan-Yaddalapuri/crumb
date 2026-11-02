@@ -18,6 +18,11 @@ import Testing
     #expect(g.facing == -1, "turns to face left")
     #expect(abs(g.position.x - (100 + Gait.stride * 2.25 - Gait.speed * 0.1)) < 1e-9, "moves at walking speed")
 
+    g.pace = Gait.speed * 2
+    let before = g.position.x
+    _ = g.step(0.1)
+    #expect(abs(before - g.position.x - Gait.speed * 0.2) < 1e-9, "a faster pace covers more ground")
+
     g.target = g.position + SIMD2(0, 50)
     _ = g.step(0.1)
     #expect(g.facing == -1, "straight up or down keeps the last facing")
