@@ -3,6 +3,7 @@ import Combine
 import CrumbCore
 import RealityKit
 
+// ponytail: full-screen ARView renders every frame, ~24% CPU measured while wandering (Plan 2, Task 7). Upgrade path: a pet-sized window that moves with the puppy, or a lower frame rate when idle.
 /// The puppy's window: borderless, transparent, covering the main screen just above the desktop icons.
 /// Clicks pass through everywhere except on the puppy.
 @MainActor
