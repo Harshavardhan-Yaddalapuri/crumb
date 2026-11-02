@@ -23,7 +23,9 @@ Multi-display support (pet stays on main display), custom arrangement zones, AI-
 
 ## 1. Character and behaviors
 
-Pet: round creature, ~64pt, lives along the bottom edge of the desktop above the Dock.
+Pet: original cartoon puppy (orange fur, cream snout and paws, floppy dark ears, blue collar), ~110×92pt, side view, lives along the bottom edge of the desktop above the Dock. Carries icons in its mouth when hauling.
+
+Art and animation: cut-out (skeletal) puppet. Parts: body, head, near/far ear, tail, four legs, mouth open/closed, eyes open/closed. Each part has a pivot; a per-frame loop blends between poses (stand, sit with head tilt, sniff, bite, carry, sleep, burp), drives a distance-locked walk cycle (no foot sliding), eased moves, a spring on the ears, tail wag, breathing, and fullness scaling. Implemented in one `PetSprite` file with SpriteKit nodes; hand-illustrated parts can replace the shapes later without changing the skeleton. Reference prototype: https://claude.ai/artifact/KVNPRyusCCgmBSdUjHGoyj
 
 | State | Trigger | Visual |
 |---|---|---|
@@ -31,7 +33,7 @@ Pet: round creature, ~64pt, lives along the bottom edge of the desktop above the
 | Haul | Gap appears or sort preset applied | Walks to icon, grabs it, drags it to its new spot |
 | Sniff | Junk candidate found | Walks to file, sniffs, "?" appears |
 | Ask | After Sniff | Bubble: "Eat `<filename>`?" with **Yum** / **Keep** / **Never ask about this** |
-| Eat (Bite 1–3) | Yum | Takes 2 bites if the file is < 1 MB, otherwise 3. Each bite removes a chunk from the icon sprite with a crumb-particle burst; ~0.4 s per bite |
+| Eat (Bite 1–N) | Yum | N = round(1 + 2 × log10(sizeMB + 1)), clamped to 1…10 (e.g. 2.4 MB → 2, 45 MB → 4, 180 MB → 6, 1.4 GB → 7). Each bite removes a chunk from the icon sprite, sweeping left to right, with a crumb-particle burst; ~0.5 s per bite (0.35 s when N > 5) |
 | Fullness (1–5) | Belly holds 1–5 digesting files | Belly roundness scales with count; at 5 it's stuffed: slow waddle, pats tummy |
 | Digest nap | Belly reaches 5/5 (after hauling to close the last gap) | Curls up, "zzz"; wakes as soon as a slot frees |
 | Burp | A file's own 15-min digest timer ends | Small burp, belly shrinks one step; that file moves to Trash at this moment |
