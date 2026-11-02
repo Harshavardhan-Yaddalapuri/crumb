@@ -29,7 +29,7 @@ public struct Pose: Hashable, Sendable {
 }
 
 public enum PoseName: String, CaseIterable, Sendable {
-    case stand, sitTilt, sniff, bite, carry, sleep, burp
+    case stand, sit, sitTilt, sniff, bite, carry, sleep, burp
 
     // Starting values; tune by eye with `CRUMB_SNAPSHOT` (see scripts/snapshot-poses.sh).
     public var pose: Pose {
@@ -37,14 +37,14 @@ public enum PoseName: String, CaseIterable, Sendable {
         switch self {
         case .stand:
             break
-        case .sitTilt:
+        case .sit, .sitTilt:
             // Tipping the front up lifts the front paws; dropping the body puts them back down and sinks the hips.
             p.bodyPitch = -0.3
             p.bodyDrop = 0.14
             p.legFront = 0.3
             p.legBack = -1.2
             p.headPitch = 0.25
-            p.headTilt = 0.35
+            p.headTilt = self == .sitTilt ? 0.35 : 0
         case .sniff:
             p.headPitch = 0.55
             p.legFront = -0.15

@@ -29,7 +29,7 @@ Art and animation: jointed 3D puppet rendered with RealityKit through an orthogr
 
 | State | Trigger | Visual |
 |---|---|---|
-| Idle / Wander | Default | Strolls, sits, blinks; naps after 10 min of no activity |
+| Idle / Wander | Default | Mostly sits and watches you: glances left and right, wags in bursts, blinks; now and then a short stroll over the middle of the screen (where the Dock is); naps after 10 min of no activity |
 | Haul | Gap appears or sort preset applied | Walks to icon, grabs it, drags it to its new spot |
 | Sniff | Junk candidate found | Walks to file, sniffs, "?" appears |
 | Ask | After Sniff | Bubble: "Eat `<filename>`?" with **Yum** / **Keep** / **Never ask about this** |
