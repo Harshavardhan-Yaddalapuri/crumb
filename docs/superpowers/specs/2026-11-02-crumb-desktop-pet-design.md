@@ -68,13 +68,13 @@ Deterministic rules only. Each rule is togglable in Settings.
 
 | Rule | Matches | Default age |
 |---|---|---|
-| Old screenshots | `kMDItemIsScreenCapture` or name starts with `Screenshot` / `Screen Recording` | 7 days |
+| Old screenshots | `kMDItemIsScreenCapture`, or name matches `Screenshot YYYY-MM-DD…` / `Screen Recording YYYY-MM-DD…` | 7 days |
 | Installers | `.dmg`, `.pkg`, `.zip` whose contained app already exists in `/Applications` | 3 days |
 | Duplicates | `name (1).ext`, `name copy.ext` byte-identical to the original in the same folder | Immediate |
-| Partial downloads | `.crdownload`, `.part`, `.download` | 1 day untouched |
+| Partial downloads | `.crdownload`, `.part`, `.download` files (not folders, so Safari's `.download` bundles are left alone) | 1 day untouched |
 | Temp junk | `.tmp`, `~$*` Office lock files, empty folders | 1 day |
 
-- "Age" = time since last opened (`kMDItemLastUsedDate`), falling back to modification date if never opened.
+- "Age" = time since the most recent of last opened (`kMDItemLastUsedDate`), modified, and date added (`kMDItemDateAdded`). Copies such as AirDrop or unzip can keep an old modified date, so the latest wins.
 - Never touched: any file with a Finder tag; files marked "Never ask"; non-empty folders.
 - Candidate order: oldest first, ties broken by largest size.
 - Scope: `~/Desktop` (top level) and `~/Downloads` (top level). No recursion in v1.

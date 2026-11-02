@@ -40,13 +40,13 @@ private final class Clock {
     clock.advance(minutes: 10)
     try belly.eat(try makeFile("d.png"), cell: nil)
     #expect(belly.nextBurpAt == a.digestEndsAt, "next burp is the oldest file's")
-    #expect(try belly.burp().isEmpty, "nothing burps at t=10")
+    #expect(try belly.burp().burped.isEmpty, "nothing burps at t=10")
     clock.advance(minutes: 5)
-    #expect(try belly.burp().count == 3, "three files burp together at t=15")
+    #expect(try belly.burp().burped.count == 3, "three files burp together at t=15")
     #expect(belly.history.first { $0.id == a.id }?.location.hasPrefix(trashDir.path) == true, "burped file is in the Trash")
     #expect(belly.digesting.map(\.originalPath) == [desk.appendingPathComponent("d.png").path], "only d is still digesting")
     clock.advance(minutes: 10)
-    #expect(try belly.burp().count == 1, "d burps at t=25")
+    #expect(try belly.burp().burped.count == 1, "d burps at t=25")
     #expect(belly.nextBurpAt == nil, "empty belly has no next burp")
 
     // Capacity: 5 files max.
@@ -78,6 +78,88 @@ private final class Clock {
     let young = try belly.eat(try makeFile("young.txt"), cell: nil)
     belly = try openBelly()
     #expect(belly.digesting.count == 5, "ledger survives relaunch")
-    #expect(try belly.burp().count == 4, "overdue files burp at launch")
+    #expect(try belly.burp().burped.count == 4, "overdue files burp at launch")
     #expect(belly.digesting.map(\.id) == [young.id], "younger file resumes its countdown")
+}
+
+private final class TrashSwitch {
+    var failing: Set<String> = []
+}
+
+@Test func bellyRecovery() throws {
+    let fm = FileManager.default
+    let root = fm.temporaryDirectory.appendingPathComponent("crumb-checks-\(UUID().uuidString)")
+    let desk = root.appendingPathComponent("Desktop")
+    let trashDir = root.appendingPathComponent("Trash")
+    let staging = root.appendingPathComponent("Belly")
+    for d in [desk, trashDir] { try fm.createDirectory(at: d, withIntermediateDirectories: true) }
+    defer { try? fm.removeItem(at: root) }
+
+    func makeFile(_ name: String) throws -> URL {
+        let url = desk.appendingPathComponent(name)
+        try Data(name.utf8).write(to: url)
+        return url
+    }
+    let clock = Clock()
+    let trashSwitch = TrashSwitch()
+    let fakeTrash: (URL) throws -> URL = { url in
+        if trashSwitch.failing.contains(url.lastPathComponent) { throw CocoaError(.fileWriteNoPermission) }
+        let dest = trashDir.appendingPathComponent(url.lastPathComponent)
+        try fm.moveItem(at: url, to: dest)
+        return dest
+    }
+    func openBelly() throws -> Belly { try Belly(directory: staging, now: { clock.now }, trash: fakeTrash) }
+    func inTrash(_ name: String) -> Bool { fm.fileExists(atPath: trashDir.appendingPathComponent(name).path) }
+
+    var belly = try openBelly()
+
+    // A staged file that vanished doesn't block the others.
+    let x = try belly.eat(try makeFile("x.txt"), cell: nil)
+    try belly.eat(try makeFile("y.txt"), cell: nil)
+    try fm.removeItem(atPath: x.location)
+    clock.advance(minutes: 15)
+    var result = try belly.burp()
+    #expect(result.burped.map(\.originalPath) == [desk.appendingPathComponent("y.txt").path], "y still burps")
+    #expect(!belly.history.contains { $0.id == x.id }, "vanished entry is dropped")
+
+    // A file that can't be trashed goes back to its original path.
+    trashSwitch.failing = ["z.txt"]
+    let z = try belly.eat(try makeFile("z.txt"), cell: nil)
+    clock.advance(minutes: 15)
+    result = try belly.burp()
+    #expect(result.returned.map(\.id) == [z.id], "untrashable file is returned")
+    #expect(fm.fileExists(atPath: z.originalPath), "returned file is back on the desktop")
+    #expect(belly.digesting.isEmpty, "returned file leaves the belly")
+
+    // Can't trash and something new sits at the original path: keep holding it, retry later.
+    try fm.removeItem(atPath: z.originalPath)
+    let z2 = try belly.eat(try makeFile("z.txt"), cell: nil)
+    try Data("new".utf8).write(to: URL(fileURLWithPath: z2.originalPath))
+    clock.advance(minutes: 15)
+    result = try belly.burp()
+    #expect(result.burped.isEmpty && result.returned.isEmpty, "nothing moves")
+    #expect(belly.digesting.map(\.id) == [z2.id] && fm.fileExists(atPath: z2.location), "still held safely")
+    trashSwitch.failing = []
+    #expect(try belly.burp().burped.map(\.id) == [z2.id], "burps once the Trash works again")
+
+    // Crash between writing the ledger and moving the file: entry dangles, file is still on the desktop.
+    let w = try belly.eat(try makeFile("w.txt"), cell: nil)
+    try fm.moveItem(atPath: w.location, toPath: w.originalPath)
+    belly = try openBelly()
+    #expect(!belly.history.contains { $0.id == w.id }, "dangling entry dropped at launch")
+    #expect(fm.fileExists(atPath: w.originalPath), "file untouched on the desktop")
+
+    // Corrupt ledger: set aside, staged files rescued to the Trash, app still starts.
+    let k = try belly.eat(try makeFile("k.txt"), cell: nil)
+    try Data("not json".utf8).write(to: staging.appendingPathComponent("belly.json"))
+    belly = try openBelly()
+    #expect(belly.history.isEmpty, "starts with an empty ledger")
+    #expect(inTrash("k.txt") && !fm.fileExists(atPath: k.location), "orphaned staged file goes to the Trash")
+    let leftovers = try fm.contentsOfDirectory(atPath: staging.path)
+    #expect(leftovers.contains { $0.hasPrefix("belly.json.corrupt-") }, "corrupt ledger kept for inspection")
+
+    // Long names still fit (staged as <uuid>/<name>, not <uuid>-<name>).
+    let longName = String(repeating: "n", count: 240) + ".txt"
+    let long = try belly.eat(try makeFile(longName), cell: nil)
+    #expect(fm.fileExists(atPath: long.location), "240-character name can be eaten")
 }

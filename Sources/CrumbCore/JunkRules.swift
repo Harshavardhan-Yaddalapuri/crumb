@@ -26,6 +26,8 @@ public struct FileFacts: Sendable {
     public var name: String
     public var modified: Date
     public var lastUsed: Date? = nil
+    /// When the file arrived in this folder (`kMDItemDateAdded`).
+    public var dateAdded: Date? = nil
     public var size: Int64 = 0
     public var isDirectory = false
     public var isEmptyDirectory = false
@@ -41,6 +43,9 @@ public struct FileFacts: Sendable {
         self.name = name
         self.modified = modified
     }
+
+    /// Most recent sign of life. Copies (AirDrop, unzip) can keep an old modified date, so take the latest.
+    public var lastActivity: Date { [lastUsed, dateAdded].compactMap { $0 }.reduce(modified, max) }
 }
 
 /// Decide whether one file is junk. Tagged and "never ask" files are always kept.
@@ -49,16 +54,18 @@ public func classify(
 ) -> Verdict {
     if !f.tags.isEmpty || f.neverAsk { return .keep }
     guard let reason = reason(for: f), enabled.contains(reason) else { return .keep }
-    let age = now.timeIntervalSince(f.lastUsed ?? f.modified)
+    let age = now.timeIntervalSince(f.lastActivity)
     return age >= reason.minAge ? .junk(reason) : .keep
 }
 
 private func reason(for f: FileFacts) -> JunkReason? {
     let ext = (f.name as NSString).pathExtension.lowercased()
-    // Before the folder check: Safari's .download is a folder bundle.
-    if ["crdownload", "part", "download"].contains(ext) { return .partialDownload }
+    // Folders: only empty ones. Non-empty folders are never touched, even Safari's .download bundles.
     if f.isDirectory { return f.isEmptyDirectory ? .temp : nil }
-    if f.isScreenCapture || f.name.hasPrefix("Screenshot") || f.name.hasPrefix("Screen Recording") {
+    if ["crdownload", "part", "download"].contains(ext) { return .partialDownload }
+    if f.isScreenCapture
+        || f.name.range(of: #"^(Screenshot|Screen Recording) \d{4}-\d{2}-\d{2}"#, options: .regularExpression) != nil
+    {
         return .screenshot
     }
     if ext == "tmp" || f.name.hasPrefix("~$") { return .temp }
@@ -80,7 +87,6 @@ public func originalName(forDuplicate name: String) -> String? {
 /// Ask about the oldest junk first; ties go to the biggest file.
 public func candidateOrder(_ files: [FileFacts]) -> [FileFacts] {
     files.sorted { a, b in
-        let ad = a.lastUsed ?? a.modified, bd = b.lastUsed ?? b.modified
-        return ad != bd ? ad < bd : a.size > b.size
+        a.lastActivity != b.lastActivity ? a.lastActivity < b.lastActivity : a.size > b.size
     }
 }

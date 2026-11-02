@@ -873,3 +873,9 @@ git commit -m "Add Belly: staging, per-file digest timers, Trash, undo ledger"
 ## Out of scope here (Plan 2, after the spike)
 
 PetOverlay window, PetSprite skeletal animation (bite timing 0.5 s / 0.35 s when N > 5 lives there), PetBrain state machine and anti-annoyance rules, FolderWatcher (FSEvents), the `FileFacts` scanner, FinderBridge (pixel ↔ cell conversion uses Task 1's grid numbers), Burrow, permissions UI, pet menu, Settings.
+
+## Post-review fixes (applied after Tasks 2–5)
+
+A final review found ways files could be stranded and two junk-rule gaps. The code in `Sources/` now differs from the task code blocks above:
+- **Belly:** the ledger is written before the move; staging is `<uuid>/<name>`; `burp()` returns `BurpResult` (burped / returned), skips vanished files, and returns untrashable files to their original path instead of blocking; launch reconciles the ledger with staging; a corrupt ledger is set aside and orphans go to the Trash. New test: `bellyRecovery`.
+- **JunkRules:** non-empty folders are never junk (including `.download` bundles); age uses `lastActivity` = latest of lastUsed / modified / dateAdded; screenshot names must match `Screenshot YYYY-MM-DD…`.
