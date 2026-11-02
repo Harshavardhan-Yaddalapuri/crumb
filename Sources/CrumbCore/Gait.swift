@@ -1,0 +1,51 @@
+/// Walking in screen points. The walk cycle advances with distance covered, not time, so feet never slide.
+public struct Gait: Sendable {
+    public static let speed = 70.0  // points per second
+    public static let stride = 36.0  // points per full leg cycle
+
+    public var position: SIMD2<Double>
+    public var target: SIMD2<Double>
+    /// 0..<1 through the leg cycle.
+    public private(set) var phase = 0.0
+    /// +1 facing right, -1 facing left; the last horizontal direction walked.
+    public private(set) var facing = 1
+
+    public init(at p: SIMD2<Double>) {
+        position = p
+        target = p
+    }
+
+    public var isWalking: Bool { position != target }
+
+    /// Moves toward the target; returns the distance covered.
+    public mutating func step(_ dt: Double) -> Double {
+        let delta = target - position
+        let dist = (delta * delta).sum().squareRoot()
+        guard dist > 0 else { return 0 }
+        let move = min(dist, Self.speed * dt)
+        position = move == dist ? target : position + delta * (move / dist)
+        if delta.x != 0 { facing = delta.x > 0 ? 1 : -1 }
+        phase = (phase + move / Self.stride).truncatingRemainder(dividingBy: 1)
+        return move
+    }
+}
+
+/// Damped spring for floppy parts (ears). Sub-steps so long frames stay stable.
+public struct Spring: Sendable {
+    public var value: Float = 0
+    public var velocity: Float = 0
+    public var stiffness: Float = 140
+    public var damping: Float = 9
+
+    public init() {}
+
+    public mutating func step(toward target: Float, dt: Double) {
+        var left = Float(dt)
+        while left > 0 {
+            let h = min(left, 1.0 / 120)
+            velocity += ((target - value) * stiffness - velocity * damping) * h
+            value += velocity * h
+            left -= h
+        }
+    }
+}
