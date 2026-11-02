@@ -25,7 +25,7 @@ Multi-display support (pet stays on main display), custom arrangement zones, AI-
 
 Pet: original chibi black puppy (glossy black fur, big eyes, floppy ears, orange collar with a gold tag, cream bib), about 110 pt tall, a 3D model built by `art/build_crumb.py` (Blender) and exported to `art/crumb.usdz`. Faces the viewer when idle or asking; turns three-quarter toward where it walks. Lives along the bottom edge of the desktop above the Dock. Carries icons in its mouth when hauling.
 
-Art and animation: jointed 3D puppet rendered with RealityKit through an orthographic camera (1 m = 92 pt), so the nose can be placed on an exact screen point. Joints: BodyPivot, HeadPivot, JawPivot, TailPivot, EarL/R, EyeL/R, four legs. `PuppetRig` sets them from a `Pose` (stand, sit with head tilt, sniff, bite, carry, sleep, burp); `Pet` blends poses, drives a distance-locked walk cycle (no foot sliding), a spring on the ears, blinking and breathing. Reshaping the model in Blender doesn't change code as long as the pivot names stay.
+Art and animation: jointed 3D puppet rendered with RealityKit through an orthographic camera (1 m = 92 pt), so the nose can be placed on an exact screen point. Joints: BodyPivot, HeadPivot, JawPivot, TailPivot, EarL/R, EyeL/R, four legs. `PuppetRig` sets them from a `Pose` (stand, sit, sit with head tilt, sniff, bite, carry, sleep, burp); `Pet` blends poses, drives a distance-locked walk cycle (no foot sliding), a spring on the ears, blinking and breathing. Reshaping the model in Blender doesn't change code as long as the pivot names stay.
 
 | State | Trigger | Visual |
 |---|---|---|

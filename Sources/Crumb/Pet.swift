@@ -12,7 +12,7 @@ final class Pet {
     var gait: Gait
     /// The pose it is easing toward while standing still.
     var goal = PoseName.stand
-    /// false freezes the wander decisions (snapshot mode, and later PetBrain).
+    /// false freezes wander decisions and idle extras (snapshot mode, and later PetBrain).
     var autopilot = true
 
     private var pose = Pose()
@@ -108,7 +108,8 @@ final class Pet {
         case ..<0.2:
             goal = .stand
             let band = Self.strollBand.lowerBound * map.width...Self.strollBand.upperBound * map.width
-            let x = gait.position.x + .random(in: 80...260) * (Bool.random() ? 1 : -1)
+            let d = Double.random(in: 80...260) * (Bool.random() ? 1 : -1)
+            let x = band.contains(gait.position.x + d) ? gait.position.x + d : gait.position.x - d  // turn back at the band's edge
             gait.target = SIMD2(min(max(x, band.lowerBound), band.upperBound), groundY)
         case ..<0.55:
             goal = .sit  // sit and watch the user
