@@ -8,6 +8,7 @@ public struct DesktopGrid: Equatable, Sendable {
     public var rows: Int
 
     public init(firstCenter: CGPoint, pitch: CGSize, rows: Int) {
+        precondition(rows > 0, "grid needs at least one row")
         self.firstCenter = firstCenter
         self.pitch = pitch
         self.rows = rows
@@ -28,9 +29,10 @@ public struct DesktopGrid: Equatable, Sendable {
     }
 
     public func cell(nearest p: CGPoint) -> Cell {
-        let col = Int(((firstCenter.x - p.x) / pitch.width).rounded())
-        let row = Int(((p.y - firstCenter.y) / pitch.height).rounded())
-        return Cell(col: max(0, col), row: min(rows - 1, max(0, row)))
+        // Clamp before converting so a wild position can't trap in Int(_:) or overflow slot maths downstream.
+        let col = ((firstCenter.x - p.x) / pitch.width).rounded()
+        let row = ((p.y - firstCenter.y) / pitch.height).rounded()
+        return Cell(col: Int(min(max(col, 0), 10_000)), row: Int(min(max(row, 0), Double(rows - 1))))
     }
 }
 
@@ -40,7 +42,7 @@ public struct FinderLayout: Equatable, Sendable {
     public var gridSpacing: Double
     public var textSize: Double
     public var labelOnBottom: Bool
-    /// `DesktopViewSettings.IconViewSettings.arrangeBy`: "none" unless Sort By is set.
+    /// DesktopViewSettings.IconViewSettings.arrangeBy: "none", or "grid" for Snap to Grid; anything else is a Sort By.
     public var arrangeBy: String
     /// `DesktopViewSettings.GroupBy`: "None" unless Use Stacks / Group By is on.
     public var groupBy: String
@@ -64,7 +66,7 @@ public struct FinderLayout: Equatable, Sendable {
     }
 
     public var problem: Problem? {
-        if arrangeBy != "none" || groupBy != "None" { return .sorted }
+        if !["none", "grid"].contains(arrangeBy) || groupBy != "None" { return .sorted }
         if iconSize != 64 || gridSpacing != 54 || textSize != 12 || !labelOnBottom { return .unknownGrid }
         return nil
     }

@@ -43,7 +43,7 @@ public struct Move: Equatable, Sendable {
 
 /// Pack icons into the first slots with no gaps. `.off` keeps the current reading order;
 /// other modes sort first. Moves come in target-slot order, so in `.off` each target is already free.
-/// ponytail: sort modes can briefly stack two icons on one cell mid-haul; add swap-aware ordering if it looks bad.
+/// ponytail: sort modes, or off-grid icons snapped to the same cell, can briefly stack two icons mid-haul; add swap-aware ordering if it looks bad.
 public func planMoves(_ icons: [DesktopIcon], rows: Int, sort: SortMode) -> [Move] {
     precondition(rows > 0, "grid needs at least one row")
     func slot(_ c: Cell) -> Int { c.col * rows + c.row }

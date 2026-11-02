@@ -12,4 +12,8 @@ import Testing
     #expect(grid.cell(nearest: CGPoint(x: 1790, y: 240)) == Cell(col: 1, row: 2), "off-grid icons snap to the nearest slot")
     #expect(grid.cell(nearest: CGPoint(x: 1950, y: -40)) == Cell(col: 0, row: 0), "never a negative column or row")
     #expect(grid.cell(nearest: CGPoint(x: 1854, y: 1060)) == Cell(col: 0, row: 7), "never past the last row")
+    #expect(grid.cell(nearest: CGPoint(x: 1854 - 62, y: 70)) == Cell(col: 1, row: 0), "exact half-pitch rounds away from the first column")
+    #expect(grid.cell(nearest: CGPoint(x: 1e12, y: -1e12)) == Cell(col: 0, row: 0), "wild positions clamp instead of trapping")
+    #expect(DesktopGrid.measured(screen: CGSize(width: 1920, height: 1123)).rows == 8, "row count, just under the next row")
+    #expect(DesktopGrid.measured(screen: CGSize(width: 1920, height: 1124)).rows == 9, "and just over it")
 }

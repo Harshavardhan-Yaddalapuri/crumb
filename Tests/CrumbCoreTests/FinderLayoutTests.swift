@@ -10,9 +10,18 @@ import Testing
     var stacks = measured
     stacks.groupBy = "Kind"
     #expect(stacks.problem == .sorted, "Use Stacks / Group By counts as sorted")
+    var snap = measured
+    snap.arrangeBy = "grid"
+    #expect(snap.problem == nil, "Snap to Grid uses the same slots")
     var bigIcons = measured
     bigIcons.iconSize = 80
     #expect(bigIcons.problem == .unknownGrid, "a grid we never measured")
+    var spacing = measured
+    spacing.gridSpacing = 60
+    #expect(spacing.problem == .unknownGrid, "different grid spacing")
+    var text = measured
+    text.textSize = 14
+    #expect(text.problem == .unknownGrid, "different label size")
     var labelRight = measured
     labelRight.labelOnBottom = false
     #expect(labelRight.problem == .unknownGrid, "labels on the right change the grid")
