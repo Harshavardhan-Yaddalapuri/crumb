@@ -5,7 +5,7 @@ import RealityKit
 
 // ponytail: full-screen ARView renders every frame, ~24% CPU measured while wandering (Plan 2, Task 7). Upgrade path: a pet-sized window that moves with the puppy, or a lower frame rate when idle.
 /// The puppy's window: borderless, transparent, covering the main screen just above the desktop icons.
-/// Clicks pass through everywhere except on the puppy.
+/// Clicks pass through everywhere except on the puppy and its speech bubble.
 @MainActor
 final class PetOverlay {
     /// Points per metre: the 1.2 m model ends up about 110 pt tall.
@@ -15,6 +15,7 @@ final class PetOverlay {
     let view: PetView
     let pet: Pet
     private var updates: Cancellable?
+    private var bubble: Bubble?
 
     init(screen: NSScreen, model: Entity) throws {
         let size = screen.frame.size
@@ -51,10 +52,6 @@ final class PetOverlay {
         anchor.addChild(rig.entity)
         pet = Pet(rig: rig, map: map, groundY: groundY)
 
-        let menu = NSMenu()
-        menu.addItem(withTitle: "Quit Crumb", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        view.menu = menu
-
         updates = view.scene.subscribe(to: SceneEvents.Update.self) { [weak self] event in
             MainActor.assumeIsolated { self?.tick(dt: event.deltaTime) }
         }
@@ -63,10 +60,28 @@ final class PetOverlay {
 
     private func tick(dt: Double) {
         pet.update(dt: dt)
-        // Take clicks only while the mouse is over the puppy. AppKit's mouse y points up; the pet's frame is top-left.
+        // The bubble rides above the puppy's head. Views use AppKit's y-up coordinates; the pet's frame is top-left.
+        if let bubble {
+            let size = bubble.frame.size
+            let top = max(4, pet.frame.minY - size.height - 6)
+            let x = min(max(4, pet.frame.midX - size.width / 2), view.bounds.width - size.width - 4)
+            bubble.setFrameOrigin(NSPoint(x: x, y: view.bounds.height - top - size.height))
+        }
+        // Take clicks only while the mouse is over the puppy or its bubble.
         let mouse = NSEvent.mouseLocation
         let topLeft = CGPoint(x: mouse.x - window.frame.minX, y: window.frame.maxY - mouse.y)
-        window.ignoresMouseEvents = !pet.frame.contains(topLeft)
+        let overBubble = bubble.map { b in
+            CGRect(x: b.frame.minX, y: view.bounds.height - b.frame.maxY, width: b.frame.width, height: b.frame.height)
+                .contains(topLeft)
+        } ?? false
+        window.ignoresMouseEvents = !(pet.frame.contains(topLeft) || overBubble)
+    }
+
+    /// Shows a speech bubble above the puppy, replacing any current one; nil hides it.
+    func say(_ text: String?, buttons: [(String, () -> Void)] = []) {
+        bubble?.removeFromSuperview()
+        bubble = text.map { Bubble($0, buttons: buttons) }
+        if let bubble { view.addSubview(bubble) }
     }
 
     /// Writes one PNG per pose (plus "walk") into `dir`, cropped around the puppy, then quits.
