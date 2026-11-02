@@ -1,7 +1,7 @@
 """Build Crumb, the chibi black puppy, as a jointed model.
 
 Run:  /Applications/Blender.app/Contents/MacOS/Blender -b -P art/build_crumb.py
-Out:  art/crumb.glb, art/crumb.blend, art/previews/*.png
+Out:  art/crumb.usdz (the app loads this), art/crumb.glb, art/crumb.blend, art/previews/*.png
 
 Every moving part hangs off a named pivot empty (HeadPivot, JawPivot, EarL...)
 so the app can animate joints in code. The dog faces -Y in Blender, which
@@ -203,6 +203,12 @@ bpy.ops.export_scene.gltf(
     export_yup=True,
     export_apply=False,
     export_animations=False,
+)
+bpy.ops.wm.usd_export(
+    filepath=os.path.join(HERE, "crumb.usdz"),
+    selected_objects_only=False,
+    export_materials=True,
+    export_animation=False,
 )
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "crumb.blend"))
 
