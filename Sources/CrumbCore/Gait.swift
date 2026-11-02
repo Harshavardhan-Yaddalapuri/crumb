@@ -24,28 +24,8 @@ public struct Gait: Sendable {
         guard dist > 0 else { return 0 }
         let move = min(dist, Self.speed * dt)
         position = move == dist ? target : position + delta * (move / dist)
-        if delta.x != 0 { facing = delta.x > 0 ? 1 : -1 }
+        if abs(delta.x) > 0.5 { facing = delta.x > 0 ? 1 : -1 }  // ignore sub-point drift so it doesn't flip as it arrives
         phase = (phase + move / Self.stride).truncatingRemainder(dividingBy: 1)
         return move
-    }
-}
-
-/// Damped spring for floppy parts (ears). Sub-steps so long frames stay stable.
-public struct Spring: Sendable {
-    public var value: Float = 0
-    public var velocity: Float = 0
-    public var stiffness: Float = 140
-    public var damping: Float = 9
-
-    public init() {}
-
-    public mutating func step(toward target: Float, dt: Double) {
-        var left = Float(dt)
-        while left > 0 {
-            let h = min(left, 1.0 / 120)
-            velocity += ((target - value) * stiffness - velocity * damping) * h
-            value += velocity * h
-            left -= h
-        }
     }
 }

@@ -10,4 +10,5 @@ import Testing
     #expect(half.eyeOpen == (stand.eyeOpen + bite.eyeOpen) / 2, "eyes too")
     #expect(Set(PoseName.allCases.map(\.pose)).count == PoseName.allCases.count, "every pose is distinct")
     #expect(PoseName.bite.pose.jaw > PoseName.carry.pose.jaw, "biting opens wider than carrying")
+    #expect(Mirror(reflecting: Pose()).children.count == Pose.joints.count, "mix covers every joint")
 }

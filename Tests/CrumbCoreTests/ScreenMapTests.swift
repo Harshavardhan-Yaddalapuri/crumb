@@ -11,5 +11,5 @@ import CoreGraphics
     let back = map.screen(map.world(CGPoint(x: 1854, y: 70)))
     #expect(abs(back.x - 1854) < 0.01 && abs(back.y - 70) < 0.01, "round trip (Float precision)")
     // RealityKit's OrthographicCameraComponent.scale is half the visible height (measured in the render spike).
-    #expect(map.cameraScale == 5.4, "1080 pt tall at 100 pt/m is 10.8 m, half of it is 5.4")
+    #expect(abs(map.cameraScale - 5.4) < 1e-6, "1080 pt tall at 100 pt/m is 10.8 m, half of it is 5.4")
 }

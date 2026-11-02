@@ -6,7 +6,7 @@ import Testing
     for _ in 0..<120 { s.step(toward: 1, dt: 1.0 / 60) }
     #expect(abs(s.value - 1) < 0.02, "settles on the target within 2 s")
     var big = Spring()
-    big.step(toward: 1, dt: 5)  // e.g. the Mac woke from sleep
+    big.step(toward: 1, dt: 1e6)  // e.g. the Mac woke from a long sleep
     #expect(abs(big.value - 1) < 0.02, "a huge time step stays stable")
     var bouncy = Spring()
     var peak: Float = 0
