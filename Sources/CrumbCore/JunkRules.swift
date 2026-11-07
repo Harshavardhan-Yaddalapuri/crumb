@@ -90,3 +90,17 @@ public func candidateOrder(_ files: [FileFacts]) -> [FileFacts] {
         a.lastActivity != b.lastActivity ? a.lastActivity < b.lastActivity : a.size > b.size
     }
 }
+
+// ponytail: matches by name only ("Figma-124.5-arm64.dmg" ↔ "Figma.app"); looking inside the .dmg/.zip would
+// need mounting or unpacking it. Every match still goes through an Ask, so a false match only costs a question.
+/// Whether an installer's name starts with the name of an app in `apps` (names of installed `.app` bundles,
+/// without the extension). Compares letters and digits only, ignoring case; app names under 4 characters must
+/// match the installer's whole name so "Arc" doesn't match "archive.zip".
+public func installerMatchesInstalledApp(_ installer: String, apps: [String]) -> Bool {
+    func key(_ s: String) -> String { String(s.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains)) }
+    let stem = key((installer as NSString).deletingPathExtension)
+    guard !stem.isEmpty else { return false }
+    return apps.map(key).contains { app in
+        !app.isEmpty && (app == stem || (app.count >= 4 && stem.hasPrefix(app)))
+    }
+}
