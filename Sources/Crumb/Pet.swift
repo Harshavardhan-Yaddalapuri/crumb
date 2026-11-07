@@ -18,6 +18,8 @@ final class Pet {
     private(set) var onJob = false
     /// While set, called every frame with the screen point a carried icon should be at.
     var onHold: ((CGPoint) -> Void)?
+    /// Files digesting (0…bellyCapacity). The belly rounds out with each one; when stuffed it waddles slowly.
+    var fullness = 0
     private var arrival: CheckedContinuation<Void, Never>?
 
     private var pose = Pose()
@@ -31,11 +33,17 @@ final class Pet {
     private var awakeSince = 0.0
     private var look: Float = 0, lookTarget: Float = 0, nextLook = 3.0
     private var wag: Float = 0, wagUntil = 0.0, nextWag = 4.0
+    private var bellyShown: Float = 0
 
     /// Spec: naps after 10 min with nothing to do.
     static let napAfter = 600.0
     /// Strolls stay over the middle of the screen, where the Dock is.
     static let strollBand = 0.3...0.7
+    /// Body widening per file in the belly (5 files → 25% rounder).
+    static let bellyPerFile: Float = 0.05
+
+    /// Pace multiplier: a stuffed puppy waddles.
+    private var waddle: Double { fullness >= bellyCapacity ? 0.6 : 1 }
 
     /// The model is about 0.92 m wide and 1.2 m tall with its feet at the origin.
     static let size = (width: 0.92, height: 1.2)
@@ -74,6 +82,7 @@ final class Pet {
         // Three-quarter view while walking (and all through a job), face the viewer when still.
         yaw += ((gait.isWalking || onJob ? Float(gait.facing) * 0.6 : 0) - yaw) * ease(8)
         stepAmount += ((gait.isWalking ? 0.45 : 0) - stepAmount) * ease(10)
+        bellyShown += (Self.bellyPerFile * Float(fullness) - bellyShown) * ease(3)
         ears.step(toward: gait.isWalking ? 0.35 : 0, dt: dt)
 
         var shown = pose
@@ -87,7 +96,8 @@ final class Pet {
             swing: stepAmount * sin(Float(gait.phase) * 2 * .pi),
             yaw: yaw,
             ears: ears.value,
-            breath: 0.015 * sin(Float(clock) * 2.2))
+            breath: 0.015 * sin(Float(clock) * 2.2),
+            belly: bellyShown)
         let feet = map.world(CGPoint(x: gait.position.x, y: gait.position.y))
         rig.entity.position = SIMD3(feet.x, feet.y, 0)
         if let onHold {
@@ -105,7 +115,7 @@ final class Pet {
         onJob = true
         awakeSince = clock
         let side: Double = p.x >= gait.position.x ? 1 : -1
-        gait.pace = pace
+        gait.pace = pace * waddle
         gait.target = SIMD2(p.x - Self.hold.ahead * side, p.y + Self.hold.up)
         await withCheckedContinuation { arrival = $0 }  // resumed by update() once it stops
         gait.facing = Int(side)  // face the icon even if the last steps went the other way
@@ -123,10 +133,20 @@ final class Pet {
         onJob = false
         onHold = nil
         goal = .stand
-        gait.pace = Gait.speed
+        gait.pace = Gait.speed * waddle
         let band = Self.strollBand.lowerBound * map.width...Self.strollBand.upperBound * map.width
         gait.target = SIMD2(min(max(gait.position.x, band.lowerBound), band.upperBound), groundY)
         autopilot = true
+    }
+
+    /// Full belly: curl up and sleep until called with `false`. No wandering or idle extras meanwhile.
+    func digestNap(_ on: Bool) {
+        autopilot = !on
+        goal = on ? .sleep : .stand
+        if !on {
+            awakeSince = clock
+            nextDecision = clock + 2
+        }
     }
 
     /// Idle life on top of the pose: glance left and right, wag in bursts. Still while walking or asleep.
@@ -157,6 +177,7 @@ final class Pet {
         switch Double.random(in: 0..<1) {
         case ..<0.2:
             goal = .stand
+            gait.pace = Gait.speed * waddle
             let band = Self.strollBand.lowerBound * map.width...Self.strollBand.upperBound * map.width
             let d = Double.random(in: 80...260) * (Bool.random() ? 1 : -1)
             let x = band.contains(gait.position.x + d) ? gait.position.x + d : gait.position.x - d  // turn back at the band's edge

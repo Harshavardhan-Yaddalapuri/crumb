@@ -13,7 +13,7 @@ final class Hauler {
 
     private let finder: FinderBridge
     private let overlay: PetOverlay
-    private let grid: DesktopGrid
+    let grid: DesktopGrid
     private let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
     private var running = false
     private var again = false
@@ -37,10 +37,20 @@ final class Hauler {
         }
     }
 
-    /// Asks for a tidy. Calls while one is running fold into it.
+    /// While true no tidy starts (Crumb is eating or napping); tidies asked for meanwhile run once it's cleared.
+    var paused = false {
+        didSet {
+            if !paused, again, !running { tidy() }
+        }
+    }
+
+    /// A tidy is running: the puppy may be on its way to an icon.
+    var isBusy: Bool { running }
+
+    /// Asks for a tidy. Calls while one is running fold into it; calls while paused wait.
     func tidy() {
         again = true
-        guard !running else { return }
+        guard !running, !paused else { return }
         running = true
         Task {
             await tidyLoop()

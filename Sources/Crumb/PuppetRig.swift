@@ -29,7 +29,8 @@ final class PuppetRig {
     /// - yaw: whole-body turn; + faces screen right.
     /// - ears: + flops both ears backward.
     /// - breath: belly scale offset.
-    func apply(_ p: Pose, swing: Float, yaw: Float, ears: Float, breath: Float) {
+    /// - belly: how full: widens the body and makes it a little taller (0 empty). Not deeper: that hides the bib.
+    func apply(_ p: Pose, swing: Float, yaw: Float, ears: Float, breath: Float, belly: Float) {
         entity.orientation = simd_quatf(angle: yaw, axis: [0, 1, 0])
         set("BodyPivot", turn(p.bodyPitch, x), move: [0, 0, -p.bodyDrop])
         set("HeadPivot", turn(p.headPitch, x) * turn(p.headTilt, y) * turn(p.headTurn, z))
@@ -43,7 +44,7 @@ final class PuppetRig {
         set("EarR", turn(ears, x))
         set("EyeL", scale: [1, 1, p.eyeOpen])
         set("EyeR", scale: [1, 1, p.eyeOpen])
-        set("Body", scale: [1 + breath, 1, 1 + breath])
+        set("Body", scale: [1 + breath + belly, 1, 1 + breath + belly * 0.4])
     }
 
     private let x: SIMD3<Float> = [1, 0, 0], y: SIMD3<Float> = [0, 1, 0], z: SIMD3<Float> = [0, 0, 1]
