@@ -40,12 +40,13 @@ final class Pet {
     /// The model is about 0.92 m wide and 1.2 m tall with its feet at the origin.
     static let size = (width: 0.92, height: 1.2)
     /// Offsets from the feet in points when facing right (x flips when facing left). Measured on the walking snapshot.
-    /// The mouth: it bites the icon here, and the small copy of the carried icon is drawn here.
-    static let mouth = (ahead: 34.0, up: 64.0)
+    /// Centre of the carried icon copy, held by its corner in the jaw. It bites the icon here too, so pick-up and drop
+    /// line up with the real icon.
+    static let mouth = (ahead: 44.0, up: 60.0)
     /// Where the real icon rides while carried. Finder draws it under the puppy, so here the head and body hide it.
     static let tuck = (ahead: 0.0, up: 66.0)
-    /// Side of the small icon copy in the mouth, points.
-    static let carriedSize = 28.0
+    /// Side of the icon copy in the mouth, points: about 80% of Finder's 64 pt icon.
+    static let carriedSize = 52.0
 
     init(rig: PuppetRig, map: ScreenMap, groundY: Double) {
         self.rig = rig

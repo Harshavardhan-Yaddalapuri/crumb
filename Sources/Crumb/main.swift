@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var overlay: PetOverlay?
     var hauler: Hauler?
     var watcher: FolderWatcher?
+    var iconCheck: Timer?
 
     func applicationDidFinishLaunching(_ note: Notification) {
         Task {
@@ -24,6 +25,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.hauler = hauler
                 let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
                 watcher = FolderWatcher(desktop) { hauler.tidy() }
+                // ponytail: polls Finder every 5 s (one ~0.1 s Apple Event; a tidy with no gaps does nothing). Finder
+                // has no notification for icon moves; Accessibility could give one but needs another permission.
+                // Moving icons around doesn't change the folder, so look for new gaps regularly. Not while a mouse
+                // button is down: the user may be mid-drag.
+                iconCheck = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+                    MainActor.assumeIsolated {
+                        if NSEvent.pressedMouseButtons == 0 { hauler.tidy() }
+                    }
+                }
                 buildMenu()
                 hauler.tidy()
             } catch {

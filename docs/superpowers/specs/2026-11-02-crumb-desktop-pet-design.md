@@ -96,8 +96,8 @@ Native Swift app, AppKit + RealityKit, no third-party dependencies.
 
 ### Data flows
 
-File removed from Desktop:
-1. FolderWatcher → `removed(file)`.
+File removed from Desktop, or an icon moved (Finder has no event for moves, so icon positions are also checked every 5 s, skipped while a mouse button is down):
+1. FolderWatcher → `removed(file)`, or the 5 s position check.
 2. PetBrain asks FinderBridge for positions → GapPlanner returns moves.
 3. Hauler plans the moves and hauls one at a time: the puppy walks to the icon, bites, and carries a small copy in its mouth while FinderBridge moves the real icon along behind its body; at the drop FinderBridge places it and reads it back. After each haul it re-plans from fresh positions.
 
