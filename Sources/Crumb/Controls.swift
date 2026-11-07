@@ -71,3 +71,37 @@ final class ActionItem: NSMenuItem {
 
     @objc private func fire() { run() }
 }
+
+/// The Belly submenu: what Crumb has eaten, newest first, each with Spit out. Rebuilt every time it opens so
+/// the minutes stay current.
+@MainActor
+final class BellyMenu: NSMenu, NSMenuDelegate {
+    static let shown = 20
+    private let eater: Eater
+
+    init(eater: Eater) {
+        self.eater = eater
+        super.init(title: "Belly")
+        autoenablesItems = false
+        delegate = self
+    }
+
+    required init(coder: NSCoder) { fatalError("not used") }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        removeAllItems()
+        let entries = eater.belly.history.suffix(Self.shown).reversed()
+        if entries.isEmpty {
+            let empty = NSMenuItem(title: "Empty", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            addItem(empty)
+        }
+        for e in entries {
+            let minutes = max(1, Int((e.digestEndsAt.timeIntervalSinceNow / 60).rounded(.up)))
+            let when = e.burped ? "in the Trash" : "burps in \(minutes) min"
+            let item = ActionItem("Spit out “\(Eater.name(e))” (\(when))") { [eater] in eater.spitOut(e.id) }
+            item.isEnabled = !eater.isBusy
+            addItem(item)
+        }
+    }
+}

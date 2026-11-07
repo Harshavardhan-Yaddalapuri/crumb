@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var hauler: Hauler?
     var watcher: FolderWatcher?
     var iconCheck: Timer?
+    var eater: Eater?
 
     func applicationDidFinishLaunching(_ note: Notification) {
         Task {
@@ -21,7 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     try await overlay.snapshotPoses(to: URL(fileURLWithPath: dir))
                     return
                 }
-                let hauler = Hauler(finder: FinderBridge(), overlay: overlay)
+                let finder = FinderBridge()
+                let hauler = Hauler(finder: finder, overlay: overlay)
                 self.hauler = hauler
                 let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
                 watcher = FolderWatcher(desktop) { hauler.tidy() }
@@ -34,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         if NSEvent.pressedMouseButtons == 0 { hauler.tidy() }
                     }
                 }
+                startEating(finder: finder, overlay: overlay, hauler: hauler)
                 buildMenu()
                 hauler.tidy()
             } catch {
@@ -46,6 +49,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate {
+    /// Eaten files wait in ~/Library/Application Support/Crumb/Belly. Without a belly Crumb only tidies.
+    func startEating(finder: FinderBridge, overlay: PetOverlay, hauler: Hauler) {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        do {
+            let belly = try Belly(directory: support.appendingPathComponent("Crumb/Belly"))
+            let eater = Eater(belly: belly, overlay: overlay, finder: finder, hauler: hauler)
+            self.eater = eater
+            eater.start()
+        } catch {
+            NSLog("Crumb: can't open the belly, so no eating: \(error)")
+        }
+    }
+
     /// The pet menu (click the puppy). Rebuilt when a choice changes so the checkmark follows.
     func buildMenu() {
         guard let overlay, let hauler else { return }
@@ -59,6 +75,12 @@ extension AppDelegate {
         let sortItem = NSMenuItem(title: "Sort by", action: nil, keyEquivalent: "")
         sortItem.submenu = sortMenu
         let menu = NSMenu()
+        if let eater {
+            menu.addItem(ActionItem("Clean up now") { eater.cleanUpNow() })
+            let bellyItem = NSMenuItem(title: "Belly", action: nil, keyEquivalent: "")
+            bellyItem.submenu = BellyMenu(eater: eater)
+            menu.addItem(bellyItem)
+        }
         menu.addItem(sortItem)
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Crumb", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
