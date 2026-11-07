@@ -218,8 +218,9 @@ public struct BiteHole: Equatable, Sendable {
 /// The holes in an icon after `bite` of `count` bites, eaten from the left (mirror x when eating from the right).
 /// Bite k leaves a scalloped edge at x = k / count with everything behind it gone; the last bite takes it all.
 /// Holes only ever grow from one bite to the next.
+/// `count` is 1…10 (the range of `biteCount`); above about 13 the 0.12 minimum radius would let holes shrink.
 public func biteHoles(after bite: Int, of count: Int) -> [BiteHole] {
-    precondition(count >= 1 && (0...count).contains(bite), "bite \(bite) of \(count)")
+    precondition((1...10).contains(count) && (0...count).contains(bite), "bite \(bite) of \(count)")
     if bite == 0 { return [] }
     if bite == count { return [BiteHole(x: 0.5, y: 0.5, r: 0.75)] }  // reaches the corners (0.707 away)
     let r = max(0.12, 0.6 / Double(count))
@@ -277,6 +278,8 @@ import Testing
         ("googlechrome.dmg", true, "spaces and case ignored"),
         ("GoogleChrome_universal.pkg", true, "underscore suffix"),
         ("zoomusInstallerFull.pkg", true, "dots ignored"),
+        ("Figma-124.5.zip", true, "zip with a version number"),
+        ("Figma export.zip", false, "zip that's the user's own archive"),
         ("Arc.dmg", true, "short app name, whole-name match"),
         ("archive.zip", false, "short app name doesn't prefix-match"),
         ("VSCode-darwin-universal.zip", false, "abbreviation isn't recognised"),
@@ -302,12 +305,18 @@ Expected: compile error `cannot find 'installerMatchesInstalledApp' in scope`.
 /// Whether an installer's name starts with the name of an app in `apps` (names of installed `.app` bundles,
 /// without the extension). Compares letters and digits only, ignoring case; app names under 4 characters must
 /// match the installer's whole name so "Arc" doesn't match "archive.zip".
+/// For .zip, the rest of the name must start with a digit (a version), so "Figma export.zip" isn't an installer.
 public func installerMatchesInstalledApp(_ installer: String, apps: [String]) -> Bool {
     func key(_ s: String) -> String { String(s.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains)) }
     let stem = key((installer as NSString).deletingPathExtension)
+    let isZip = (installer as NSString).pathExtension.lowercased() == "zip"
     guard !stem.isEmpty else { return false }
     return apps.map(key).contains { app in
-        !app.isEmpty && (app == stem || (app.count >= 4 && stem.hasPrefix(app)))
+        guard !app.isEmpty else { return false }
+        if app == stem { return true }
+        guard app.count >= 4, stem.hasPrefix(app) else { return false }
+        // A .zip is often the user's own archive ("Slack export.zip"): only a version number may follow the name.
+        return !isZip || stem.dropFirst(app.count).first?.isNumber == true
     }
 }
 ```
@@ -378,8 +387,9 @@ enum Scanner {
         f.size = Int64(v.fileSize ?? 0)
         f.tags = v.tagNames ?? []
         // Apps and other packages are folders on disk but single items to the user: never "empty folders".
+        // Folders that live only in iCloud aren't listed (that would fetch them), so they count as not empty.
         f.isDirectory = v.isDirectory == true
-        if f.isDirectory, v.isPackage != true {
+        if f.isDirectory, v.isPackage != true, !isDataless(url) {
             let inside = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? ["?"]
             f.isEmptyDirectory = inside.allSatisfy { [".DS_Store", ".localized"].contains($0) }
         }
@@ -512,6 +522,9 @@ final class Hauler {
 
     /// A tidy is running: the puppy may be on its way to an icon.
     var isBusy: Bool { running }
+
+    /// Showing a problem (sad face and bubble). Eating waits meanwhile so its bubbles don't replace this one.
+    var isComplaining: Bool { complaint != nil }
 
     /// Asks for a tidy. Calls while one is running fold into it; calls while paused wait.
     func tidy() {
@@ -944,8 +957,8 @@ import CrumbCore
 import QuickLookThumbnailing
 
 /// A same-size picture of a file's icon, laid exactly over the real one while Crumb eats it. Bites cut holes.
-/// Only one icon is ever visible: the file moves into the belly at the first bite, so the real icon is gone
-/// from under the picture before any hole shows.
+/// Only one icon is ever visible: the file moves into the belly right after the picture appears, before the
+/// first bite, so the real icon is gone from under the picture before any hole shows.
 final class MealView: NSView {
     private let image: NSImage
     /// Eaten from the right (puppy facing left): holes are mirrored.
@@ -1340,7 +1353,7 @@ final class Eater {
             if !pet.onJob, !napping {
                 Task {
                     await pet.perform(.burp, for: 0.8)
-                    pet.goal = .stand
+                    if !pet.onJob { pet.goal = .stand }
                 }
             }
             hauler.tidy()
@@ -1369,19 +1382,24 @@ final class Eater {
     private var enabledRules: Set<JunkReason> { Set(JunkReason.allCases.filter { !disabledRules.contains($0.rawValue) }) }
 
     private func lookForJunk() async {
-        guard !isBusy, !hauler.isBusy, !pet.onJob, NSEvent.pressedMouseButtons == 0,
+        guard !isBusy, !hauler.isBusy, !hauler.isComplaining, !pet.onJob, NSEvent.pressedMouseButtons == 0,
             policy.mayAsk(now: .now, bellyFull: belly.isFull, napping: napping)
         else { return }
-        let found = Scanner.candidates(in: desktop, neverAsk: neverAsk, enabled: enabledRules)
-        guard !found.isEmpty else { return finishCleanUp() }
         isBusy = true
         hauler.paused = true
         defer {
             isBusy = false
             hauler.paused = napping
         }
+        // Off the main thread: comparing a big local copy with its original reads both files.
+        let (folder, skip, rules) = (desktop, neverAsk, enabledRules)
+        let found = await Task.detached { Scanner.candidates(in: folder, neverAsk: skip, enabled: rules) }.value
+        guard !found.isEmpty else { return finishCleanUp() }
         guard let icons = try? await finder.icons() else {
-            policy.cleaningUp = false  // Finder isn't answering; Hauler says why
+            if policy.cleaningUp {
+                overlay.say("Finder isn't answering, so I can't find the files.", hideAfter: .seconds(4))
+            }
+            policy.cleaningUp = false
             return
         }
         // Finder shows ":" in file names as "/". Only icons on this screen with a unique name.
@@ -1450,28 +1468,22 @@ final class Eater {
     // MARK: - Eating
 
     private func eat(_ c: Scanner.Candidate, at p: CGPoint) async {
-        // The answer may have taken a while: only eat the file that was asked about, unchanged and still junk.
-        guard let fresh = Scanner.facts(for: c.url), fresh.modified == c.facts.modified, fresh.size == c.facts.size,
-            classify(fresh, now: .now, enabled: enabledRules) != .keep
-        else {
-            overlay.say("It changed, so I'll leave it.", hideAfter: .seconds(3))
-            await pet.perform(.shrug, for: 1.2)
-            return
-        }
-        guard await download(c.url) else {
-            await pet.perform(.shrug, for: 1.2)
-            return
-        }
+        guard await download(c.url) else { return await giveUp() }
         let size = FinderBridge.layout().iconSize
         let picture = await IconPicture.load(c.url, size: size)  // while the file is still in place
+        // The answer, download and picture may have taken a while: only eat the file that was asked about,
+        // unchanged and still junk. Checked last so nothing else happens between this and the move.
+        let url = c.url
+        let fresh = await Task.detached { Scanner.facts(for: url) }.value
+        guard let fresh, fresh.modified == c.facts.modified, fresh.size == c.facts.size,
+            classify(fresh, now: .now, enabled: enabledRules) != .keep
+        else { return await giveUp("It changed, so I'll leave it.") }
         overlay.showMeal(picture, at: p, size: size, mirrored: pet.gait.facing < 0)  // eat from the snout's side
         do {
             try belly.eat(c.url, cell: hauler.grid.cell(nearest: p))
         } catch {
             overlay.hideMeal()
-            overlay.say("Couldn't eat that one.", hideAfter: .seconds(3))
-            await pet.perform(.shrug, for: 1.2)
-            return
+            return await giveUp("Couldn't eat that one.")
         }
         afterBellyChange()
         let bites = biteCount(bytes: c.facts.size)
@@ -1490,6 +1502,14 @@ final class Eater {
                 startNap()
             }
         }
+    }
+
+    /// Eating didn't happen: say why (if there's anything to say), shrug, and end a Clean up so the same file
+    /// isn't asked about again right away.
+    private func giveUp(_ text: String? = nil) async {
+        policy.cleaningUp = false
+        if let text { overlay.say(text, hideAfter: .seconds(3)) }
+        await pet.perform(.shrug, for: 1.2)
     }
 
     /// iCloud may keep only a placeholder on the Mac. Moving it into the belly downloads it and blocks until done,
@@ -1776,7 +1796,7 @@ git commit -m "Add Eater: sniff, ask, eat, digest, burp and spit out; Clean up n
   - **Spit out row:** "Coughs the file back to its original position" → "Puts the file back on the Desktop (from the belly or the Trash) and Crumb packs it into place; a spat-out file is never asked about again".
   - **Ask row:** add "**Never ask about this** turns off that rule (e.g. screenshots); Settings (Plan 4b) turns it back on."
   - **Anti-annoyance:** "or a Focus mode is on" → "(Focus status is only available to apps with a special Apple entitlement, so Focus isn't detected)".
-  - **§2 Installers row:** "whose contained app already exists in `/Applications`" → "whose name starts with an app in `/Applications` or `~/Applications` (matched by name; contents aren't opened)".
+  - **§2 Installers row:** "whose contained app already exists in `/Applications`" → "whose name starts with an app in `/Applications` or `~/Applications` (matched by name; contents aren't opened). A `.zip` must be the app's name or the name followed by a version number, so the user's own archives (\"Slack export.zip\") aren't installers".
   - **§2, after the rules table:** add "- iCloud placeholders: rules read only metadata; duplicates are compared only when both files are local. After Yum, a placeholder is downloaded first (up to a minute) so moving it never blocks."
   - **§4 Finder automation denied:** "Eating still works; hauling disabled." → "Hauling and eating pause: Crumb needs icon positions to walk to a file."
 
@@ -1803,6 +1823,18 @@ git commit -m "Spec and findings: eating with a same-size picture, iCloud placeh
 ```
 
 ---
+
+## Post-review fixes (applied after Tasks 1–7)
+
+Code review asked for these, and the code blocks above already include them:
+- **Scans run off the main thread.** Comparing a big local copy with its original reads both files, so `Scanner.candidates` and the pre-eat `Scanner.facts` run in `Task.detached`. `isBusy` is set before that `await`, so two scans can't overlap.
+- **Stricter `.zip` installer match:** exact name, or the name followed by a version number.
+- **Folders that live only in iCloud aren't listed**, because listing them would fetch them. They count as not empty.
+- **`biteHoles` only accepts 1…10 bites**, the range of `biteCount`; above about 13, holes could shrink.
+- **The file is re-checked last.** That happens after the iCloud download and the picture, right before it moves into the belly.
+- **Any failed eat ends a Clean up** (`giveUp`), so the same file isn't asked about again at once.
+- **Eating waits while Hauler is complaining** (`Hauler.isComplaining`), so its bubbles don't replace a complaint. Clean up says so when Finder doesn't answer.
+- **Spit out's burp doesn't override a running tidy's pose.**
 
 ## Self-review notes
 
