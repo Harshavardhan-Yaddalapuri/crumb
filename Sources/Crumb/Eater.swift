@@ -64,27 +64,67 @@ final class Eater {
         }
     }
 
-    /// Undo: put a file back on the desktop, from the belly or from the Trash.
+    /// Undo: put a file back on the desktop, from the belly or from the Trash. Crumb turns, coughs the file
+    /// up (a picture slides out of its mouth and the real icon is moved in under it), then carries it to a slot.
     func spitOut(_ id: UUID) {
-        guard !isBusy else { return }
-        do {
-            let entry = try belly.spitOut(id)
-            neverAsk.insert(entry.originalPath)  // taking it back means "keep it": don't ask about it again
-            afterBellyChange()
-            overlay.say("Here's “\(Self.name(entry))” back.", hideAfter: .seconds(3))
-            if !pet.onJob, !napping {
-                Task {
-                    await pet.perform(.burp, for: 0.8)
-                    if !pet.onJob { pet.goal = .stand }
-                }
-            }
-            hauler.tidy()
-        } catch BellyError.destinationExists(let path) {
-            overlay.say(
-                "There's already a file called “\((path as NSString).lastPathComponent)” there.", hideAfter: .seconds(4))
-        } catch {
-            overlay.say("I can't find that one any more. Was the Trash emptied?", hideAfter: .seconds(4))
+        Task { await spit(id) }
+    }
+
+    private func spit(_ id: UUID) async {
+        await whenIdle()  // returns with nothing running, so the next line can't race another job
+        guard let entry = belly.history.first(where: { $0.id == id }) else { return }  // already spat out
+        isBusy = true
+        hauler.paused = true
+        defer {
+            isBusy = false
+            hauler.paused = napping
         }
+        if napping { wake() }
+        let name = Self.name(entry)
+        let size = FinderBridge.layout().iconSize
+        let picture = await IconPicture.load(URL(fileURLWithPath: entry.location), size: size)
+        // Where a carried icon sits, on the side it's facing; walk(toHold:) makes this a job without walking.
+        let feet = pet.gait.position
+        let side: Double = pet.gait.facing < 0 ? -1 : 1
+        let mouth = CGPoint(x: feet.x + Pet.hold.ahead * side, y: feet.y - Pet.hold.up)
+        await pet.walk(toHold: mouth, pace: Hauler.trot)
+        pet.goal = .burp
+        overlay.showMeal(
+            picture, at: mouth, size: size, mirrored: false,
+            emerging: CGPoint(x: mouth.x - size / 2 * side, y: mouth.y))
+        try? await Task.sleep(for: .seconds(0.35))
+        do {
+            try belly.spitOut(id)
+        } catch BellyError.destinationExists(let path) {
+            return failSpit("There's already a file called “\((path as NSString).lastPathComponent)” there.")
+        } catch {
+            return failSpit("I can't find that one any more. Was the Trash emptied?")
+        }
+        neverAsk.insert(entry.originalPath)  // taking it back means "keep it": don't ask about it again
+        afterBellyChange()
+        // Finder notices the file within a few tenths of a second; move the real icon in under the picture.
+        let finderName = name.replacingOccurrences(of: ":", with: "/")
+        for _ in 0..<20 {
+            if (try? await finder.place(finderName, at: mouth)) == true { break }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        overlay.hideMeal()
+        overlay.say("Here's “\(name)” back.", hideAfter: .seconds(3))
+        pet.goal = .stand
+        hauler.tidy(carrying: finderName)  // starts as this job ends: picks it up where it lies
+        if belly.isFull {
+            Task {
+                await whenIdle()
+                startNap()
+            }
+        }
+    }
+
+    private func failSpit(_ text: String) {
+        overlay.hideMeal()
+        overlay.say(text, hideAfter: .seconds(4))
+        pet.goHome()
+        if belly.isFull { startNap() }
     }
 
     static func name(_ entry: BellyEntry) -> String { (entry.originalPath as NSString).lastPathComponent }

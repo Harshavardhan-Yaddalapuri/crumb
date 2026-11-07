@@ -10,6 +10,8 @@ final class Hauler {
     /// Safety stop for one tidy, in case a plan never settles.
     static let maxHauls = 60
     private static func key(_ m: Move) -> String { "\(m.id)→\(m.to.col),\(m.to.row)" }
+    /// Planned as if past the last slot, so a loose icon always gets carried to its proper slot.
+    private static let outside = Cell(col: 100_000, row: 0)
 
     private let finder: FinderBridge
     private let overlay: PetOverlay
@@ -18,6 +20,8 @@ final class Hauler {
     private var running = false
     private var again = false
     private var failedMoves: Set<String> = []  // moves whose drop didn't stick; skipped until the desktop is tidy
+    /// Icons to carry on the next tidy even if they sit inside their slot already (a spat-out file by the mouth).
+    private var loose: Set<String> = []
     /// The complaint currently shown, so each problem is said once rather than on every check.
     private var complaint: String?
     private var retry: Task<Void, Never>?
@@ -61,17 +65,28 @@ final class Hauler {
         }
     }
 
+    /// Tidies, carrying `name` to its slot from wherever it is.
+    func tidy(carrying name: String) {
+        loose.insert(name)
+        tidy()
+    }
+
     private func tidyLoop() async {
         var hauls = 0
         while again, hauls < Self.maxHauls {
             again = false
             guard let icons = await survey() else { break }
             let moves = planMoves(icons.map(\.icon), rows: grid.rows, sort: sort)
-            if moves.isEmpty { failedMoves.removeAll() }
+            if moves.isEmpty {
+                failedMoves.removeAll()
+                loose.removeAll()  // a loose icon always has a move, so these aren't on the desktop
+            }
             guard let move = moves.first(where: { !failedMoves.contains(Self.key($0)) }) else { continue }
             let from = icons.first { $0.icon.id == move.id }!.position
             hauls += 1
-            guard await haul(move.id, from: from, to: grid.center(of: move.to)) else {
+            let placed = await haul(move.id, from: from, to: grid.center(of: move.to))
+            loose.remove(move.id)
+            guard placed else {
                 failedMoves.insert(Self.key(move))
                 break
             }
@@ -131,7 +146,7 @@ final class Hauler {
             let added = (try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate
             let icon = DesktopIcon(
                 id: item.name, name: item.name, kind: url.pathExtension.lowercased(), date: added ?? .distantPast,
-                cell: grid.cell(nearest: item.position))
+                cell: loose.contains(item.name) ? Self.outside : grid.cell(nearest: item.position))
             return (icon, item.position)
         }
     }

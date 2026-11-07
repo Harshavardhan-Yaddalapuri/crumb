@@ -102,11 +102,23 @@ final class PetOverlay {
     // MARK: - Eating
 
     /// Lays a same-size picture of an icon exactly over the real one. `center` is in Finder points (top-left).
-    func showMeal(_ image: NSImage, at center: CGPoint, size: Double, mirrored: Bool) {
+    /// With `emerging`, it fades in while sliding from that point to `center` (out of the puppy's mouth).
+    func showMeal(_ image: NSImage, at center: CGPoint, size: Double, mirrored: Bool, emerging from: CGPoint? = nil) {
         hideMeal()
-        let frame = NSRect(x: center.x - size / 2, y: view.bounds.height - center.y - size / 2, width: size, height: size)
-        let v = MealView(image: image, frame: frame, mirrored: mirrored)
+        func frame(_ c: CGPoint) -> NSRect {
+            NSRect(x: c.x - size / 2, y: view.bounds.height - c.y - size / 2, width: size, height: size)
+        }
+        let v = MealView(image: image, frame: frame(from ?? center), mirrored: mirrored)
         view.addSubview(v, positioned: .below, relativeTo: effects)
+        if from != nil {
+            v.alphaValue = 0
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.3
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                v.animator().alphaValue = 1
+                v.animator().frame = frame(center)
+            }
+        }
         meal = (v, center, size, mirrored)
     }
 
