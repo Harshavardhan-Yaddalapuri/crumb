@@ -37,7 +37,7 @@ Art and animation: jointed 3D puppet rendered with RealityKit through an orthogr
 | Fullness (1–5) | Belly holds 1–5 digesting files | Belly roundness scales with count; at 5 it's stuffed: slow waddle (0.6× pace); body widens 5% per file |
 | Digest nap | Belly reaches 5/5 (after hauling to close the last gap) | Curls up, "zzz"; wakes as soon as a slot frees |
 | Burp | A file's own 15-min digest timer ends | Small burp, belly shrinks one step; that file moves to Trash at this moment |
-| Spit out | Undo (click sleeping pet → "Spit it out", or from Belly history) | Crumb turns and coughs the file up: a same-size picture slides out of its mouth, the file goes back on the Desktop (from the belly or the Trash) with its real icon moved in under the picture, then Crumb carries it to a free slot; a spat-out file is never asked about again |
+| Spit out | Undo (click sleeping pet → "Spit it out", or from Belly history) | Crumb turns and coughs the file up: a same-size picture slides out of its mouth, the file goes back on the Desktop (from the belly or the Trash) with its real icon moved in under the picture, then Crumb carries it to a free slot; a spat-out file is never asked about again (kept files are remembered by path, size and modified time, so a new file with the same name is still checked) |
 | Burrow | Stale file found in Downloads | Hops into Dock's Downloads stack, pops out dragging the file, then Sniff → Ask on the desktop |
 | Shrug | A job fails or is skipped | Shrug animation, optional short bubble |
 | Sad | Finder automation permission missing | Sad face, bubble "I need permission to tidy" with button to System Settings |

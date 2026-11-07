@@ -24,7 +24,7 @@ enum Scanner {
         var found: [String: Candidate] = [:]
         for url in urls {
             guard var facts = facts(for: url, apps: apps) else { continue }
-            facts.neverAsk = neverAsk.contains(url.path)
+            facts.neverAsk = neverAsk.contains(keepKey(url, facts))
             if case .junk(let reason) = classify(facts, now: now, enabled: enabled) {
                 found[facts.name] = Candidate(url: url, facts: facts, reason: reason)
             }
@@ -65,6 +65,12 @@ enum Scanner {
                 && (!local || FileManager.default.contentsEqual(atPath: url.path, andPath: other.path))
         }
         return f
+    }
+
+    /// How the never-ask list remembers a kept file: its path, size and modified time (whole seconds, so
+    /// iCloud's sub-microsecond date shifts don't matter). A new file with the same name, or an edit, doesn't match.
+    static func keepKey(_ url: URL, _ f: FileFacts) -> String {
+        "\(url.path)|\(f.size)|\(Int(f.modified.timeIntervalSince1970.rounded(.down)))"
     }
 
     /// The file "Report copy.pdf" would be a duplicate of ("Report.pdf" next to it), or nil.

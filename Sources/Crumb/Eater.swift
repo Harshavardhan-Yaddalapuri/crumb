@@ -100,7 +100,9 @@ final class Eater {
         } catch {
             return failSpit("I can't find that one any more. Was the Trash emptied?")
         }
-        neverAsk.insert(entry.originalPath)  // taking it back means "keep it": don't ask about it again
+        // Taking it back means "keep it": don't ask about this file again.
+        let back = URL(fileURLWithPath: entry.originalPath)
+        if let facts = await Task.detached(operation: { Scanner.facts(for: back) }).value { neverAsk.insert(Scanner.keepKey(back, facts)) }
         afterBellyChange()
         // Finder notices the file within a few tenths of a second; move the real icon in under the picture.
         let finderName = name.replacingOccurrences(of: ":", with: "/")
@@ -131,6 +133,7 @@ final class Eater {
 
     // MARK: - Asking
 
+    /// Kept files, as `Scanner.keepKey`s.
     private var neverAsk: Set<String> {
         get { Set(defaults.stringArray(forKey: "neverAsk") ?? []) }
         set { defaults.set(newValue.sorted(), forKey: "neverAsk") }
@@ -196,7 +199,7 @@ final class Eater {
         case .yum:
             await eat(c, at: p)
         case .keep:
-            neverAsk.insert(c.url.path)
+            neverAsk.insert(Scanner.keepKey(c.url, c.facts))
         case .neverAskRule:
             disabledRules.insert(c.reason.rawValue)
         case .noAnswer:
