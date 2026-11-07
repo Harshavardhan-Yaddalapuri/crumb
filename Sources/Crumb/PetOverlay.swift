@@ -68,12 +68,7 @@ final class PetOverlay {
     private func tick(dt: Double) {
         pet.update(dt: dt)
         // The bubble rides above the puppy's head. Views use AppKit's y-up coordinates; the pet's frame is top-left.
-        if let bubble {
-            let size = bubble.frame.size
-            let top = max(4, pet.frame.minY - size.height - 6)
-            let x = min(max(4, pet.frame.midX - size.width / 2), view.bounds.width - size.width - 4)
-            bubble.setFrameOrigin(NSPoint(x: x, y: view.bounds.height - top - size.height))
-        }
+        if let bubble { place(bubble) }
         // Take clicks only while the mouse is over the puppy or its bubble.
         let mouse = NSEvent.mouseLocation
         let topLeft = CGPoint(x: mouse.x - window.frame.minX, y: window.frame.maxY - mouse.y)
@@ -84,12 +79,23 @@ final class PetOverlay {
         window.ignoresMouseEvents = !(pet.frame.contains(topLeft) || overBubble)
     }
 
+    /// Above the puppy's head, kept on screen.
+    private func place(_ bubble: Bubble) {
+        let size = bubble.frame.size
+        let top = max(4, pet.frame.minY - size.height - 6)
+        let x = min(max(4, pet.frame.midX - size.width / 2), view.bounds.width - size.width - 4)
+        bubble.setFrameOrigin(NSPoint(x: x, y: view.bounds.height - top - size.height))
+    }
+
     /// Shows a speech bubble above the puppy, replacing any current one; nil hides it.
     /// With `hideAfter`, it goes away by itself unless something else was said meanwhile.
     func say(_ text: String?, buttons: [(String, () -> Void)] = [], hideAfter: Duration? = nil) {
         bubble?.removeFromSuperview()
         bubble = text.map { Bubble($0, buttons: buttons) }
-        if let bubble { view.addSubview(bubble) }
+        if let bubble {
+            place(bubble)  // before it's shown, or it flashes at the window's corner for a frame
+            view.addSubview(bubble)
+        }
         bubbleID += 1
         guard let hideAfter else { return }
         let id = bubbleID

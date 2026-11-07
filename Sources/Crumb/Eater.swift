@@ -109,7 +109,7 @@ final class Eater {
             try? await Task.sleep(for: .milliseconds(100))
         }
         overlay.hideMeal()
-        overlay.say("Here's “\(name)” back.", hideAfter: .seconds(3))
+        overlay.say("Here's “\(name)” back. I won't ask about it again.", hideAfter: .seconds(4))
         pet.goal = .stand
         hauler.tidy(carrying: finderName)  // starts as this job ends: picks it up where it lies
         if belly.isFull {
@@ -240,7 +240,8 @@ final class Eater {
         // unchanged and still junk. Checked last so nothing else happens between this and the move.
         let url = c.url
         let fresh = await Task.detached { Scanner.facts(for: url) }.value
-        guard let fresh, fresh.modified == c.facts.modified, fresh.size == c.facts.size else {
+        // iCloud nudges the stored date by a fraction of a microsecond when it downloads a file; an edit moves it more.
+        guard let fresh, abs(fresh.modified.timeIntervalSince(c.facts.modified)) < 0.01, fresh.size == c.facts.size else {
             return await giveUp("It changed, so I'll leave it.")
         }
         // Never eat a copy that wasn't compared byte for byte (e.g. iCloud evicted one again meanwhile).
@@ -258,11 +259,11 @@ final class Eater {
         }
         afterBellyChange()
         let bites = biteCount(bytes: c.facts.size)
-        let beat = bites > 5 ? 0.35 : 0.5
+        let chew = bites > 5 ? 0.4 : 0.6
         for k in 1...bites {
-            await pet.perform(.bite, for: beat / 2)
+            await pet.perform(.bite, for: 0.3)
             overlay.biteMeal(k, of: bites)
-            await pet.perform(.stand, for: beat / 2)
+            await pet.perform(.stand, for: chew)
         }
         overlay.hideMeal()
         hauler.tidy()  // runs once this job ends
