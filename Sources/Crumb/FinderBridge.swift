@@ -35,6 +35,9 @@ final class FinderBridge: @unchecked Sendable {  // mutable state is only touche
         on icons()
             tell application "Finder" to return {name, desktop position} of every item of desktop
         end icons
+        on refreshDesktop()
+            tell application "Finder" to update desktop
+        end refreshDesktop
         on moveIcon(n, x, y)
             tell application "Finder"
                 set desktop position of item n of desktop to {x, y}
@@ -65,6 +68,12 @@ final class FinderBridge: @unchecked Sendable {  // mutable state is only touche
             }
             return false
         }
+    }
+
+    /// Asks Finder to redraw the desktop from disk. Finder's records drop a moved-away file at once, but its
+    /// on-screen icon can linger a second or two (seen with files just fetched from iCloud).
+    func refresh() async {
+        _ = try? await onQueue { [self] in _ = try call("refreshDesktop") }
     }
 
     /// Streams an icon along while the puppy carries it. Latest wins: if Finder is still busy with the

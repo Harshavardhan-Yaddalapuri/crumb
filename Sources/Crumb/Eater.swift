@@ -261,6 +261,10 @@ final class Eater {
             return await giveUp("Couldn't eat that one.")
         }
         afterBellyChange()
+        // The real icon must be gone before the first hole, or the hole shows it underneath. Finder's screen can
+        // lag its records (seen with files just fetched from iCloud): ask it to redraw, and give it a moment.
+        await finder.refresh()
+        await pet.perform(.sniff, for: 0.6)
         let bites = biteCount(bytes: c.facts.size)
         let chew = bites > 5 ? 0.4 : 0.6
         for k in 1...bites {
