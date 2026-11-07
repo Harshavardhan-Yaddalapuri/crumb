@@ -30,7 +30,7 @@ Art and animation: jointed 3D puppet rendered with RealityKit through an orthogr
 | State | Trigger | Visual |
 |---|---|---|
 | Idle / Wander | Default | Mostly sits and watches you: glances left and right, wags in bursts, blinks; now and then a short stroll over the middle of the screen (where the Dock is); naps after 10 min of no activity |
-| Haul | Gap appears or sort preset applied | Trots to the icon, picks it up, and carries it to its new spot: a small copy of the icon rides in its mouth while Finder moves the real icon along ~20×/s tucked behind its body (Finder can't shrink one icon; long names may peek out). Strolls back to the Dock after |
+| Haul | Gap appears or sort preset applied | Trots to the icon, picks it up, and carries the real icon (Finder moves it along ~20×/s) to its new spot; strolls back to the Dock after |
 | Sniff | Junk candidate found | Walks to file, sniffs, "?" appears |
 | Ask | After Sniff | Bubble: "Eat `<filename>`?" with **Yum** / **Keep** / **Never ask about this** |
 | Eat (Bite 1–N) | Yum | N = round(1 + 2 × log10(sizeMB + 1)), clamped to 1…10 (e.g. 2.4 MB → 2, 45 MB → 4, 180 MB → 6, 1.4 GB → 7). Each bite removes a chunk from the icon sprite, sweeping left to right, with a crumb-particle burst; ~0.5 s per bite (0.35 s when N > 5) |
@@ -99,7 +99,7 @@ Native Swift app, AppKit + RealityKit, no third-party dependencies.
 File removed from Desktop, or an icon moved (Finder has no event for moves, so icon positions are also checked every 5 s, skipped while a mouse button is down):
 1. FolderWatcher → `removed(file)`, or the 5 s position check.
 2. PetBrain asks FinderBridge for positions → GapPlanner returns moves.
-3. Hauler plans the moves and hauls one at a time: the puppy walks to the icon, bites, and carries a small copy in its mouth while FinderBridge moves the real icon along behind its body; at the drop FinderBridge places it and reads it back. After each haul it re-plans from fresh positions.
+3. Hauler plans the moves and hauls one at a time: the puppy walks to the icon, bites, and carries the real icon while FinderBridge moves it along; at the drop FinderBridge places it and reads it back. After each haul it re-plans from fresh positions.
 
 Eating:
 1. JunkRules flags file → PetBrain queues Sniff/Ask.

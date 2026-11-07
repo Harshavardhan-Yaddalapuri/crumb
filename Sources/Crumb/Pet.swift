@@ -16,7 +16,7 @@ final class Pet {
     var autopilot = true
     /// On a job it keeps facing the way it walks instead of turning to the viewer when it stops.
     private(set) var onJob = false
-    /// While set, called every frame with the screen point the real carried icon should be at (tucked behind the body).
+    /// While set, called every frame with the screen point a carried icon should be at.
     var onHold: ((CGPoint) -> Void)?
     private var arrival: CheckedContinuation<Void, Never>?
 
@@ -39,14 +39,9 @@ final class Pet {
 
     /// The model is about 0.92 m wide and 1.2 m tall with its feet at the origin.
     static let size = (width: 0.92, height: 1.2)
-    /// Offsets from the feet in points when facing right (x flips when facing left). Measured on the walking snapshot.
-    /// Centre of the carried icon copy, held by its corner in the jaw. It bites the icon here too, so pick-up and drop
-    /// line up with the real icon.
-    static let mouth = (ahead: 44.0, up: 60.0)
-    /// Where the real icon rides while carried. Finder draws it under the puppy, so here the head and body hide it.
-    static let tuck = (ahead: 0.0, up: 66.0)
-    /// Side of the icon copy in the mouth, points: about 80% of Finder's 64 pt icon.
-    static let carriedSize = 52.0
+    /// Where a carried icon's centre sits relative to the feet, in points, when facing right (x flips when facing left).
+    /// Ahead of the snout so the head doesn't hide it: the real icon is drawn by Finder, under the puppy.
+    static let hold = (ahead: 58.0, up: 52.0)
 
     init(rig: PuppetRig, map: ScreenMap, groundY: Double) {
         self.rig = rig
@@ -95,15 +90,10 @@ final class Pet {
             breath: 0.015 * sin(Float(clock) * 2.2))
         let feet = map.world(CGPoint(x: gait.position.x, y: gait.position.y))
         rig.entity.position = SIMD3(feet.x, feet.y, 0)
-        onHold?(CGPoint(x: gait.position.x + Self.tuck.ahead * turn, y: gait.position.y - Self.tuck.up))
-    }
-
-    /// -1 facing left ... 1 facing right, smooth while it turns.
-    private var turn: Double { Double(sin(yaw) / sin(0.6)) }
-
-    /// Screen point (top-left origin) of the mouth, following the turn.
-    var mouthPoint: CGPoint {
-        CGPoint(x: gait.position.x + Self.mouth.ahead * turn, y: gait.position.y - Self.mouth.up)
+        if let onHold {
+            let turn = Double(sin(yaw) / sin(0.6))  // -1 facing left ... 1 facing right, smooth while it turns
+            onHold(CGPoint(x: gait.position.x + Self.hold.ahead * turn, y: gait.position.y - Self.hold.up))
+        }
     }
 
     // MARK: - Jobs
@@ -116,7 +106,7 @@ final class Pet {
         awakeSince = clock
         let side: Double = p.x >= gait.position.x ? 1 : -1
         gait.pace = pace
-        gait.target = SIMD2(p.x - Self.mouth.ahead * side, p.y + Self.mouth.up)
+        gait.target = SIMD2(p.x - Self.hold.ahead * side, p.y + Self.hold.up)
         await withCheckedContinuation { arrival = $0 }  // resumed by update() once it stops
         gait.facing = Int(side)  // face the icon even if the last steps went the other way
     }

@@ -16,26 +16,6 @@ final class PetOverlay {
     let pet: Pet
     private var updates: Cancellable?
     private var bubble: Bubble?
-    private var carriedView: NSImageView?
-
-    /// A small picture of the carried file, drawn in the puppy's mouth; nil removes it.
-    var carried: NSImage? {
-        didSet {
-            guard let carried else {
-                carriedView?.removeFromSuperview()
-                carriedView = nil
-                return
-            }
-            if carriedView == nil {
-                let v = ClickThroughImageView()
-                v.imageScaling = .scaleProportionallyUpOrDown
-                view.addSubview(v, positioned: .below, relativeTo: bubble)  // speech bubbles stay on top
-                carriedView = v
-                placeCarried()
-            }
-            carriedView?.image = carried
-        }
-    }
 
     init(screen: NSScreen, model: Entity) throws {
         let size = screen.frame.size
@@ -80,7 +60,6 @@ final class PetOverlay {
 
     private func tick(dt: Double) {
         pet.update(dt: dt)
-        placeCarried()
         // The bubble rides above the puppy's head. Views use AppKit's y-up coordinates; the pet's frame is top-left.
         if let bubble {
             let size = bubble.frame.size
@@ -96,13 +75,6 @@ final class PetOverlay {
                 .contains(topLeft)
         } ?? false
         window.ignoresMouseEvents = !(pet.frame.contains(topLeft) || overBubble)
-    }
-
-    /// Centres the carried picture on the mouth (AppKit's y points up; the pet's points are top-left).
-    private func placeCarried() {
-        guard let carriedView else { return }
-        let m = pet.mouthPoint, s = Pet.carriedSize
-        carriedView.frame = NSRect(x: m.x - s / 2, y: view.bounds.height - m.y - s / 2, width: s, height: s)
     }
 
     /// Shows a speech bubble above the puppy, replacing any current one; nil hides it.
@@ -133,11 +105,6 @@ final class PetOverlay {
         }
         NSApp.terminate(nil)
     }
-}
-
-/// Never takes clicks, so clicking the puppy still opens its menu.
-final class ClickThroughImageView: NSImageView {
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// Shows the pet menu on click.
