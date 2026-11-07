@@ -1,5 +1,6 @@
 import AppKit
 import CrumbCore
+import QuickLookThumbnailing
 
 /// Keeps the desktop packed. When asked to tidy (a file left the desktop, the sort mode changed) it reads the
 /// icons from Finder, plans the moves, and has the puppy carry one icon at a time, re-planning from fresh
@@ -21,6 +22,9 @@ final class Hauler {
     /// The complaint currently shown, so each problem is said once rather than on every check.
     private var complaint: String?
     private var retry: Task<Void, Never>?
+    /// What the carried file looks like: its icon at first, Finder's content preview once that's ready.
+    private var look: NSImage?
+    private var lookFetch: Task<Void, Never>?
     private var pet: Pet { overlay.pet }
 
     init(finder: FinderBridge, overlay: PetOverlay) {
@@ -67,17 +71,45 @@ final class Hauler {
         if pet.onJob { pet.goHome() }
     }
 
-    /// Picks the icon up at `from`, carries the real icon to `to` (Finder moves it along), and verifies the drop.
+    /// Picks the icon up at `from`, carries it to `to`, and verifies the drop. A small copy rides in the mouth while
+    /// Finder moves the real icon along behind the puppy's body (Finder can't shrink a single icon).
     private func haul(_ name: String, from: CGPoint, to: CGPoint) async -> Bool {
+        fetchLook(file(name))
         await pet.walk(toHold: from, pace: Self.trot)
         await pet.perform(.bite, for: 0.35)
+        overlay.carried = look
         pet.onHold = { [finder] p in finder.drag(name, to: p) }
         await pet.walk(toHold: to, pace: Self.trot)
         pet.onHold = nil
         let placed = (try? await finder.place(name, at: to)) ?? false
         if !placed { _ = try? await finder.place(name, at: from) }  // put it back rather than leave it mid-carry
+        overlay.carried = nil  // only now, so the real icon is already back in view
+        lookFetch?.cancel()
         await pet.perform(placed ? .stand : .shrug, for: placed ? 0.2 : 1.2)
         return placed
+    }
+
+    // ponytail: always asks for a content preview; if the user turned off Finder's "Show icon preview", Finder
+    // shows plain icons while the copy may show a preview. Read IconViewSettings.showIconPreview if that matters.
+    /// Starts with the file's icon and swaps in Finder's content preview (screenshots, PDFs…) when it arrives.
+    /// If no preview comes back, the icon stays.
+    private func fetchLook(_ url: URL) {
+        lookFetch?.cancel()
+        look = NSWorkspace.shared.icon(forFile: url.path)
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url, size: CGSize(width: 64, height: 64), scale: 2, representationTypes: .all)
+        lookFetch = Task { [weak self] in
+            guard let preview = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage,
+                !Task.isCancelled, let self
+            else { return }
+            look = preview
+            if overlay.carried != nil { overlay.carried = preview }  // arrived mid-carry
+        }
+    }
+
+    /// The file behind a desktop icon. Finder shows ":" in file names as "/".
+    private func file(_ name: String) -> URL {
+        desktop.appendingPathComponent(name.replacingOccurrences(of: "/", with: ":"))
     }
 
     /// Current icons with their grid cells, or nil (after saying why) when tidying isn't possible right now.
@@ -113,8 +145,7 @@ final class Hauler {
         let names = Dictionary(grouping: found, by: \.name)
         let usable = found.filter { screen.contains($0.position) && names[$0.name]?.count == 1 }
         return usable.map { item in
-            // Finder shows ":" in file names as "/".
-            let url = desktop.appendingPathComponent(item.name.replacingOccurrences(of: "/", with: ":"))
+            let url = file(item.name)
             let added = (try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate
             let icon = DesktopIcon(
                 id: item.name, name: item.name, kind: url.pathExtension.lowercased(), date: added ?? .distantPast,
