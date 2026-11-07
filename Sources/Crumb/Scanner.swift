@@ -56,15 +56,20 @@ enum Scanner {
         if ["dmg", "pkg", "zip"].contains(ext) {
             f.containedAppInstalled = installerMatchesInstalledApp(f.name, apps: apps ?? installedApps())
         }
-        // ponytail: copies whose contents live only in iCloud are never compared, so never flagged. Comparing
-        // would download both files on every scan. Upgrade path: compare iCloud's content hashes if exposed.
-        if !f.isDirectory, let original = originalName(forDuplicate: f.name) {
-            let other = url.deletingLastPathComponent().appendingPathComponent(original)
+        // Both local: compare every byte. Either only in iCloud: same size counts for now (comparing would
+        // download both on every scan); after Yum, Eater downloads both and this runs again with the real check.
+        if !f.isDirectory, let other = original(of: url) {
             let otherSize = (try? other.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
-            f.identicalOriginalExists = otherSize.map(Int64.init) == f.size && !isDataless(url) && !isDataless(other)
-                && FileManager.default.contentsEqual(atPath: url.path, andPath: other.path)
+            let local = !isDataless(url) && !isDataless(other)
+            f.identicalOriginalExists = otherSize.map(Int64.init) == f.size
+                && (!local || FileManager.default.contentsEqual(atPath: url.path, andPath: other.path))
         }
         return f
+    }
+
+    /// The file "Report copy.pdf" would be a duplicate of ("Report.pdf" next to it), or nil.
+    static func original(of url: URL) -> URL? {
+        originalName(forDuplicate: url.lastPathComponent).map { url.deletingLastPathComponent().appendingPathComponent($0) }
     }
 
     /// An iCloud placeholder: the name is here, the contents are in the cloud ("Optimize Mac Storage").

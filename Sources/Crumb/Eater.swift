@@ -231,15 +231,24 @@ final class Eater {
 
     private func eat(_ c: Scanner.Candidate, at p: CGPoint) async {
         guard await download(c.url) else { return await giveUp() }
+        // An iCloud-only pair was matched by size alone: fetch the original too, so the re-check compares bytes.
+        let original = c.reason == .duplicate ? Scanner.original(of: c.url) : nil
+        if let original { guard await download(original) else { return await giveUp() } }
         let size = FinderBridge.layout().iconSize
         let picture = await IconPicture.load(c.url, size: size)  // while the file is still in place
         // The answer, download and picture may have taken a while: only eat the file that was asked about,
         // unchanged and still junk. Checked last so nothing else happens between this and the move.
         let url = c.url
         let fresh = await Task.detached { Scanner.facts(for: url) }.value
-        guard let fresh, fresh.modified == c.facts.modified, fresh.size == c.facts.size,
-            classify(fresh, now: .now, enabled: enabledRules) != .keep
-        else { return await giveUp("It changed, so I'll leave it.") }
+        guard let fresh, fresh.modified == c.facts.modified, fresh.size == c.facts.size else {
+            return await giveUp("It changed, so I'll leave it.")
+        }
+        // Never eat a copy that wasn't compared byte for byte (e.g. iCloud evicted one again meanwhile).
+        if let original, Scanner.isDataless(c.url) || Scanner.isDataless(original) { return await giveUp() }
+        guard classify(fresh, now: .now, enabled: enabledRules) != .keep else {
+            if let original { return await giveUp("It's not quite the same as “\(original.lastPathComponent)”, so I'll keep it.") }
+            return await giveUp("It changed, so I'll leave it.")
+        }
         overlay.showMeal(picture, at: p, size: size, mirrored: pet.gait.facing < 0)  // eat from the snout's side
         do {
             try belly.eat(c.url, cell: hauler.grid.cell(nearest: p))
@@ -363,7 +372,7 @@ extension JunkReason {
         switch self {
         case .screenshot: "It's an old screenshot."
         case .installer: "The app is already installed."
-        case .duplicate: "It's an exact copy of another file."
+        case .duplicate: "It looks like an exact copy of another file."
         case .partialDownload: "It's an unfinished download."
         case .temp: "It looks like a leftover temp file."
         }

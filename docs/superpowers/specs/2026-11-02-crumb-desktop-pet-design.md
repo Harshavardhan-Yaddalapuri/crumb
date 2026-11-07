@@ -74,7 +74,7 @@ Deterministic rules only. Each rule is togglable in Settings.
 | Partial downloads | `.crdownload`, `.part`, `.download` files (not folders, so Safari's `.download` bundles are left alone) | 1 day untouched |
 | Temp junk | `.tmp`, `~$*` Office lock files, empty folders | 1 day |
 
-- iCloud placeholders: rules read only metadata; duplicates are compared only when both files are local. After Yum, a placeholder is downloaded first (up to a minute) so moving it never blocks.
+- iCloud placeholders: rules read only metadata; duplicates are compared byte for byte when both files are local; when either is only in iCloud, a same-size pair is asked about and, after Yum, both are downloaded and compared before eating (different → kept). After Yum, a placeholder is downloaded first (up to a minute) so moving it never blocks.
 - "Age" = time since the most recent of last opened (`kMDItemLastUsedDate`), modified, and date added (`kMDItemDateAdded`). Copies such as AirDrop or unzip can keep an old modified date, so the latest wins.
 - Never touched: any file with a Finder tag; files marked "Never ask"; non-empty folders.
 - Candidate order: oldest first, ties broken by largest size.
