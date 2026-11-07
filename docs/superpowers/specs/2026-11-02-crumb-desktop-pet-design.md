@@ -32,12 +32,12 @@ Art and animation: jointed 3D puppet rendered with RealityKit through an orthogr
 | Idle / Wander | Default | Mostly sits and watches you: glances left and right, wags in bursts, blinks; now and then a short stroll over the middle of the screen (where the Dock is); naps after 10 min of no activity |
 | Haul | Gap appears or sort preset applied | Trots to the icon, picks it up, and carries the real icon (Finder moves it along ~20×/s) to its new spot; strolls back to the Dock after |
 | Sniff | Junk candidate found | Walks to file, sniffs, "?" appears |
-| Ask | After Sniff | Bubble: "Eat `<filename>`?" with **Yum** / **Keep** / **Never ask about this** |
-| Eat (Bite 1–N) | Yum | N = round(1 + 2 × log10(sizeMB + 1)), clamped to 1…10 (e.g. 2.4 MB → 2, 45 MB → 4, 180 MB → 6, 1.4 GB → 7). Each bite removes a chunk from the icon sprite, sweeping left to right, with a crumb-particle burst; ~0.5 s per bite (0.35 s when N > 5) |
-| Fullness (1–5) | Belly holds 1–5 digesting files | Belly roundness scales with count; at 5 it's stuffed: slow waddle, pats tummy |
+| Ask | After Sniff | Bubble: "Eat `<filename>`?" with **Yum** / **Keep** / **Never ask about this** (turns off that rule, e.g. screenshots; Settings (Plan 4b) turns it back on) |
+| Eat (Bite 1–N) | Yum | N = round(1 + 2 × log10(sizeMB + 1)), clamped to 1…10 (e.g. 2.4 MB → 2, 45 MB → 4, 180 MB → 6, 1.4 GB → 7). A same-size picture of the icon is laid exactly over the real one; the file moves into the belly before the first bite, so only one icon is ever visible (the name goes with it). Each bite carves round bite marks from the snout's side, with a crumb-particle burst; ~0.5 s per bite (0.35 s when N > 5) |
+| Fullness (1–5) | Belly holds 1–5 digesting files | Belly roundness scales with count; at 5 it's stuffed: slow waddle (0.6× pace); body widens 5% per file |
 | Digest nap | Belly reaches 5/5 (after hauling to close the last gap) | Curls up, "zzz"; wakes as soon as a slot frees |
 | Burp | A file's own 15-min digest timer ends | Small burp, belly shrinks one step; that file moves to Trash at this moment |
-| Spit out | Undo (click sleeping pet → "Spit it out", or from Belly history) | Coughs the file back to its original position |
+| Spit out | Undo (click sleeping pet → "Spit it out", or from Belly history) | Puts the file back on the Desktop (from the belly or the Trash) and Crumb packs it into place; a spat-out file is never asked about again |
 | Burrow | Stale file found in Downloads | Hops into Dock's Downloads stack, pops out dragging the file, then Sniff → Ask on the desktop |
 | Shrug | A job fails or is skipped | Shrug animation, optional short bubble |
 | Sad | Finder automation permission missing | Sad face, bubble "I need permission to tidy" with button to System Settings |
@@ -51,12 +51,12 @@ Digestion model:
 - At 5/5 it naps; it wakes as soon as the oldest file burps and a slot frees.
 - Files whose timers end within the same few seconds burp together in one Burp.
 
-Bite masks: three pre-drawn "bitten" alpha masks applied in order to the icon snapshot (bite 1, bite 2, gone). Two-bite variant uses masks 1 and 3.
+Bite holes: drawn in code (`biteHoles`), any count 1–10; bite k leaves round bite marks at k/N with everything behind gone; the last bite takes the rest.
 
 Anti-annoyance rules:
 - At most one Ask per 15 minutes while wandering.
 - "Clean up now" bypasses that limit and Asks back-to-back until the belly is 5/5 or no candidates remain; then it naps.
-- Silent while a full-screen app is frontmost or a Focus mode is on.
+- Silent while a full-screen app is frontmost (Focus status is only available to apps with a special Apple entitlement, so Focus isn't detected).
 - No Asks during Digest nap; new haul/arrange jobs queue until it wakes.
 - **Keep** = never ask about that file again.
 
@@ -69,11 +69,12 @@ Deterministic rules only. Each rule is togglable in Settings.
 | Rule | Matches | Default age |
 |---|---|---|
 | Old screenshots | `kMDItemIsScreenCapture`, or name matches `Screenshot YYYY-MM-DD…` / `Screen Recording YYYY-MM-DD…` | 7 days |
-| Installers | `.dmg`, `.pkg`, `.zip` whose contained app already exists in `/Applications` | 3 days |
+| Installers | `.dmg`, `.pkg`, `.zip` whose name starts with an app in `/Applications` or `~/Applications` (matched by name; contents aren't opened). A `.zip` must be the app's name or the name followed by a version number, so the user's own archives ("Slack export.zip") aren't installers | 3 days |
 | Duplicates | `name (1).ext`, `name copy.ext` byte-identical to the original in the same folder | Immediate |
 | Partial downloads | `.crdownload`, `.part`, `.download` files (not folders, so Safari's `.download` bundles are left alone) | 1 day untouched |
 | Temp junk | `.tmp`, `~$*` Office lock files, empty folders | 1 day |
 
+- iCloud placeholders: rules read only metadata; duplicates are compared only when both files are local. After Yum, a placeholder is downloaded first (up to a minute) so moving it never blocks.
 - "Age" = time since the most recent of last opened (`kMDItemLastUsedDate`), modified, and date added (`kMDItemDateAdded`). Copies such as AirDrop or unzip can keep an old modified date, so the latest wins.
 - Never touched: any file with a Finder tag; files marked "Never ask"; non-empty folders.
 - Candidate order: oldest first, ties broken by largest size.
@@ -123,7 +124,7 @@ Resolved: the spike (spike/FINDINGS.md) showed per-icon positioning works and re
 
 | Situation | Behavior |
 |---|---|
-| Finder automation denied | Sad state with settings button. Eating still works; hauling disabled. |
+| Finder automation denied | Sad state with settings button. Hauling and eating pause: Crumb needs icon positions to walk to a file. |
 | Position set doesn't stick | FinderBridge reads back; retry once; else skip icon, Shrug, log. Never fake a move. |
 | File gone/changed before action | Job dropped, Shrug. |
 | Move to staging or Trash fails | File left in place (or returned), Spit out, bubble "Couldn't eat that one." |

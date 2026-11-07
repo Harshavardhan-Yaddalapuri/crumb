@@ -53,3 +53,13 @@ Measured with 18 temp files + `clean up window of desktop by name` (1920×1080, 
 - Finder's and Stage Manager's prefs can be read via `UserDefaults(suiteName:)` without permission. `HideDesktop = 1` with Stage Manager off doesn't hide icons. Crumb therefore detects hidden icons empirically: Finder reports no items while `~/Desktop` has files.
 - Finder shows `:` in file names as `/`. Convert back before building a path.
 - RealityKit sends no frame updates while the screen is locked, so a job in progress pauses until unlock.
+
+## Plan 4a additions (2026-11-07)
+
+- The Desktop's files are iCloud placeholders here (`ls -lO` shows `compressed,dataless`; `ubiquitousItemDownloadingStatus` = NotDownloaded). Metadata and Spotlight reads don't download them.
+- `FileManager.moveItem` of a placeholder from the iCloud Desktop to a local folder downloads it during the move and blocks until done (≈1 s for 3 MB). Moving it back re-uploads it. Download first with `startDownloadingUbiquitousItem` and poll `SF_DATALESS`.
+- `evictUbiquitousItem(at:)` makes a placeholder on demand (useful for tests); `brctl evict` no longer exists.
+- `trashItem` on a file staged in Application Support lands in `~/.Trash`; `Belly.spitOut` restores from there.
+- No Swift constant for `kMDItemIsScreenCapture`: use `"kMDItemIsScreenCapture" as CFString`.
+- Screenshot file names contain U+202F (narrow no-break space) before AM/PM.
+- `QLThumbnailGenerator` with `iconMode = true` matches Finder's desktop look for previews.
