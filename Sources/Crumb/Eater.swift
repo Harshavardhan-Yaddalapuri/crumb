@@ -75,7 +75,7 @@ final class Eater {
             if !pet.onJob, !napping {
                 Task {
                     await pet.perform(.burp, for: 0.8)
-                    pet.goal = .stand
+                    if !pet.onJob { pet.goal = .stand }
                 }
             }
             hauler.tidy()
@@ -104,7 +104,7 @@ final class Eater {
     private var enabledRules: Set<JunkReason> { Set(JunkReason.allCases.filter { !disabledRules.contains($0.rawValue) }) }
 
     private func lookForJunk() async {
-        guard !isBusy, !hauler.isBusy, !pet.onJob, NSEvent.pressedMouseButtons == 0,
+        guard !isBusy, !hauler.isBusy, !hauler.isComplaining, !pet.onJob, NSEvent.pressedMouseButtons == 0,
             policy.mayAsk(now: .now, bellyFull: belly.isFull, napping: napping)
         else { return }
         isBusy = true
@@ -118,7 +118,10 @@ final class Eater {
         let found = await Task.detached { Scanner.candidates(in: folder, neverAsk: skip, enabled: rules) }.value
         guard !found.isEmpty else { return finishCleanUp() }
         guard let icons = try? await finder.icons() else {
-            policy.cleaningUp = false  // Finder isn't answering; Hauler says why
+            if policy.cleaningUp {
+                overlay.say("Finder isn't answering, so I can't find the files.", hideAfter: .seconds(4))
+            }
+            policy.cleaningUp = false
             return
         }
         // Finder shows ":" in file names as "/". Only icons on this screen with a unique name.
@@ -187,30 +190,22 @@ final class Eater {
     // MARK: - Eating
 
     private func eat(_ c: Scanner.Candidate, at p: CGPoint) async {
-        // The answer may have taken a while: only eat the file that was asked about, unchanged and still junk.
+        guard await download(c.url) else { return await giveUp() }
+        let size = FinderBridge.layout().iconSize
+        let picture = await IconPicture.load(c.url, size: size)  // while the file is still in place
+        // The answer, download and picture may have taken a while: only eat the file that was asked about,
+        // unchanged and still junk. Checked last so nothing else happens between this and the move.
         let url = c.url
         let fresh = await Task.detached { Scanner.facts(for: url) }.value
         guard let fresh, fresh.modified == c.facts.modified, fresh.size == c.facts.size,
             classify(fresh, now: .now, enabled: enabledRules) != .keep
-        else {
-            overlay.say("It changed, so I'll leave it.", hideAfter: .seconds(3))
-            await pet.perform(.shrug, for: 1.2)
-            return
-        }
-        guard await download(c.url) else {
-            await pet.perform(.shrug, for: 1.2)
-            return
-        }
-        let size = FinderBridge.layout().iconSize
-        let picture = await IconPicture.load(c.url, size: size)  // while the file is still in place
+        else { return await giveUp("It changed, so I'll leave it.") }
         overlay.showMeal(picture, at: p, size: size, mirrored: pet.gait.facing < 0)  // eat from the snout's side
         do {
             try belly.eat(c.url, cell: hauler.grid.cell(nearest: p))
         } catch {
             overlay.hideMeal()
-            overlay.say("Couldn't eat that one.", hideAfter: .seconds(3))
-            await pet.perform(.shrug, for: 1.2)
-            return
+            return await giveUp("Couldn't eat that one.")
         }
         afterBellyChange()
         let bites = biteCount(bytes: c.facts.size)
@@ -229,6 +224,14 @@ final class Eater {
                 startNap()
             }
         }
+    }
+
+    /// Eating didn't happen: say why (if there's anything to say), shrug, and end a Clean up so the same file
+    /// isn't asked about again right away.
+    private func giveUp(_ text: String? = nil) async {
+        policy.cleaningUp = false
+        if let text { overlay.say(text, hideAfter: .seconds(3)) }
+        await pet.perform(.shrug, for: 1.2)
     }
 
     /// iCloud may keep only a placeholder on the Mac. Moving it into the belly downloads it and blocks until done,

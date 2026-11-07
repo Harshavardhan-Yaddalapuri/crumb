@@ -47,6 +47,9 @@ final class Hauler {
     /// A tidy is running: the puppy may be on its way to an icon.
     var isBusy: Bool { running }
 
+    /// Showing a problem (sad face and bubble). Eating waits meanwhile so its bubbles don't replace this one.
+    var isComplaining: Bool { complaint != nil }
+
     /// Asks for a tidy. Calls while one is running fold into it; calls while paused wait.
     func tidy() {
         again = true

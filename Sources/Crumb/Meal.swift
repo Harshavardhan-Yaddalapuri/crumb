@@ -3,8 +3,8 @@ import CrumbCore
 import QuickLookThumbnailing
 
 /// A same-size picture of a file's icon, laid exactly over the real one while Crumb eats it. Bites cut holes.
-/// Only one icon is ever visible: the file moves into the belly at the first bite, so the real icon is gone
-/// from under the picture before any hole shows.
+/// Only one icon is ever visible: the file moves into the belly right after the picture appears, before the
+/// first bite, so the real icon is gone from under the picture before any hole shows.
 final class MealView: NSView {
     private let image: NSImage
     /// Eaten from the right (puppy facing left): holes are mirrored.
