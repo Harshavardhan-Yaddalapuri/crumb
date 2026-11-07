@@ -107,14 +107,16 @@ final class Eater {
         guard !isBusy, !hauler.isBusy, !pet.onJob, NSEvent.pressedMouseButtons == 0,
             policy.mayAsk(now: .now, bellyFull: belly.isFull, napping: napping)
         else { return }
-        let found = Scanner.candidates(in: desktop, neverAsk: neverAsk, enabled: enabledRules)
-        guard !found.isEmpty else { return finishCleanUp() }
         isBusy = true
         hauler.paused = true
         defer {
             isBusy = false
             hauler.paused = napping
         }
+        // Off the main thread: comparing a big local copy with its original reads both files.
+        let (folder, skip, rules) = (desktop, neverAsk, enabledRules)
+        let found = await Task.detached { Scanner.candidates(in: folder, neverAsk: skip, enabled: rules) }.value
+        guard !found.isEmpty else { return finishCleanUp() }
         guard let icons = try? await finder.icons() else {
             policy.cleaningUp = false  // Finder isn't answering; Hauler says why
             return
@@ -186,7 +188,9 @@ final class Eater {
 
     private func eat(_ c: Scanner.Candidate, at p: CGPoint) async {
         // The answer may have taken a while: only eat the file that was asked about, unchanged and still junk.
-        guard let fresh = Scanner.facts(for: c.url), fresh.modified == c.facts.modified, fresh.size == c.facts.size,
+        let url = c.url
+        let fresh = await Task.detached { Scanner.facts(for: url) }.value
+        guard let fresh, fresh.modified == c.facts.modified, fresh.size == c.facts.size,
             classify(fresh, now: .now, enabled: enabledRules) != .keep
         else {
             overlay.say("It changed, so I'll leave it.", hideAfter: .seconds(3))

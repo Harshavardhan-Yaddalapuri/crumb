@@ -18,8 +18,9 @@ public struct BiteHole: Equatable, Sendable {
 /// The holes in an icon after `bite` of `count` bites, eaten from the left (mirror x when eating from the right).
 /// Bite k leaves a scalloped edge at x = k / count with everything behind it gone; the last bite takes it all.
 /// Holes only ever grow from one bite to the next.
+/// `count` is 1…10 (the range of `biteCount`); above about 13 the 0.12 minimum radius would let holes shrink.
 public func biteHoles(after bite: Int, of count: Int) -> [BiteHole] {
-    precondition(count >= 1 && (0...count).contains(bite), "bite \(bite) of \(count)")
+    precondition((1...10).contains(count) && (0...count).contains(bite), "bite \(bite) of \(count)")
     if bite == 0 { return [] }
     if bite == count { return [BiteHole(x: 0.5, y: 0.5, r: 0.75)] }  // reaches the corners (0.707 away)
     let r = max(0.12, 0.6 / Double(count))

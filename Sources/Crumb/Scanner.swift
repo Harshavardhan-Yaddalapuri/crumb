@@ -42,8 +42,9 @@ enum Scanner {
         f.size = Int64(v.fileSize ?? 0)
         f.tags = v.tagNames ?? []
         // Apps and other packages are folders on disk but single items to the user: never "empty folders".
+        // Folders that live only in iCloud aren't listed (that would fetch them), so they count as not empty.
         f.isDirectory = v.isDirectory == true
-        if f.isDirectory, v.isPackage != true {
+        if f.isDirectory, v.isPackage != true, !isDataless(url) {
             let inside = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? ["?"]
             f.isEmptyDirectory = inside.allSatisfy { [".DS_Store", ".localized"].contains($0) }
         }

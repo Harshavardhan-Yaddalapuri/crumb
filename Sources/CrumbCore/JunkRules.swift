@@ -96,11 +96,17 @@ public func candidateOrder(_ files: [FileFacts]) -> [FileFacts] {
 /// Whether an installer's name starts with the name of an app in `apps` (names of installed `.app` bundles,
 /// without the extension). Compares letters and digits only, ignoring case; app names under 4 characters must
 /// match the installer's whole name so "Arc" doesn't match "archive.zip".
+/// For .zip, the rest of the name must start with a digit (a version), so "Figma export.zip" isn't an installer.
 public func installerMatchesInstalledApp(_ installer: String, apps: [String]) -> Bool {
     func key(_ s: String) -> String { String(s.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains)) }
     let stem = key((installer as NSString).deletingPathExtension)
+    let isZip = (installer as NSString).pathExtension.lowercased() == "zip"
     guard !stem.isEmpty else { return false }
     return apps.map(key).contains { app in
-        !app.isEmpty && (app == stem || (app.count >= 4 && stem.hasPrefix(app)))
+        guard !app.isEmpty else { return false }
+        if app == stem { return true }
+        guard app.count >= 4, stem.hasPrefix(app) else { return false }
+        // A .zip is often the user's own archive ("Slack export.zip"): only a version number may follow the name.
+        return !isZip || stem.dropFirst(app.count).first?.isNumber == true
     }
 }

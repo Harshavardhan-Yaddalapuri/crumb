@@ -9,6 +9,8 @@ import Testing
         ("googlechrome.dmg", true, "spaces and case ignored"),
         ("GoogleChrome_universal.pkg", true, "underscore suffix"),
         ("zoomusInstallerFull.pkg", true, "dots ignored"),
+        ("Figma-124.5.zip", true, "zip with a version number"),
+        ("Figma export.zip", false, "zip that's the user's own archive"),
         ("Arc.dmg", true, "short app name, whole-name match"),
         ("archive.zip", false, "short app name doesn't prefix-match"),
         ("VSCode-darwin-universal.zip", false, "abbreviation isn't recognised"),
