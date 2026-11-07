@@ -16,6 +16,10 @@ final class PetOverlay {
     let pet: Pet
     private var updates: Cancellable?
     private var bubble: Bubble?
+    private var bubbleID = 0
+    /// Holds the crumb bursts, above meals and below bubbles.
+    private let effects = ClickThroughView()
+    private var meal: (view: MealView, center: CGPoint, size: Double, mirrored: Bool)?
 
     init(screen: NSScreen, model: Entity) throws {
         let size = screen.frame.size
@@ -34,6 +38,9 @@ final class PetOverlay {
         view = PetView(frame: NSRect(origin: .zero, size: size))
         view.environment.background = .color(.clear)
         window.contentView = view
+        effects.frame = view.bounds
+        effects.wantsLayer = true
+        view.addSubview(effects)
 
         let anchor = AnchorEntity(world: .zero)
         view.scene.addAnchor(anchor)
@@ -78,10 +85,83 @@ final class PetOverlay {
     }
 
     /// Shows a speech bubble above the puppy, replacing any current one; nil hides it.
-    func say(_ text: String?, buttons: [(String, () -> Void)] = []) {
+    /// With `hideAfter`, it goes away by itself unless something else was said meanwhile.
+    func say(_ text: String?, buttons: [(String, () -> Void)] = [], hideAfter: Duration? = nil) {
         bubble?.removeFromSuperview()
         bubble = text.map { Bubble($0, buttons: buttons) }
         if let bubble { view.addSubview(bubble) }
+        bubbleID += 1
+        guard let hideAfter else { return }
+        let id = bubbleID
+        Task {
+            try? await Task.sleep(for: hideAfter)
+            if bubbleID == id { say(nil) }
+        }
+    }
+
+    // MARK: - Eating
+
+    /// Lays a same-size picture of an icon exactly over the real one. `center` is in Finder points (top-left).
+    func showMeal(_ image: NSImage, at center: CGPoint, size: Double, mirrored: Bool) {
+        hideMeal()
+        let frame = NSRect(x: center.x - size / 2, y: view.bounds.height - center.y - size / 2, width: size, height: size)
+        let v = MealView(image: image, frame: frame, mirrored: mirrored)
+        view.addSubview(v, positioned: .below, relativeTo: effects)
+        meal = (v, center, size, mirrored)
+    }
+
+    /// Takes bite `k` of `n` out of the meal, with a burst of crumbs at the new edge.
+    func biteMeal(_ k: Int, of n: Int) {
+        guard let meal else { return }
+        meal.view.holes = biteHoles(after: k, of: n)
+        let edge = (Double(k) / Double(n) - 0.5) * meal.size * (meal.mirrored ? -1 : 1)
+        crumbs(at: CGPoint(x: meal.center.x + edge, y: meal.center.y))
+    }
+
+    func hideMeal() {
+        meal?.view.removeFromSuperview()
+        meal = nil
+    }
+
+    private static let crumb: CGImage = {
+        let dot = NSImage(size: NSSize(width: 6, height: 6), flipped: false) { r in
+            NSColor.white.setFill()
+            NSBezierPath(ovalIn: r).fill()
+            return true
+        }
+        return dot.cgImage(forProposedRect: nil, context: nil, hints: nil)!
+    }()
+
+    /// A short burst of falling crumbs at a screen point (top-left origin).
+    private func crumbs(at p: CGPoint) {
+        let cell = CAEmitterCell()
+        cell.contents = Self.crumb
+        cell.color = NSColor(calibratedRed: 0.8, green: 0.6, blue: 0.38, alpha: 1).cgColor
+        cell.redRange = 0.15
+        cell.greenRange = 0.15
+        cell.birthRate = 160
+        cell.lifetime = 0.7
+        cell.velocity = 110
+        cell.velocityRange = 50
+        cell.emissionLongitude = .pi / 2  // up: layer coordinates point up
+        cell.emissionRange = .pi * 0.8
+        cell.yAcceleration = -500  // gravity
+        cell.scale = 0.7
+        cell.scaleRange = 0.4
+        cell.alphaSpeed = -1.2
+        let emitter = CAEmitterLayer()
+        emitter.frame = effects.bounds
+        emitter.emitterPosition = CGPoint(x: p.x, y: effects.bounds.height - p.y)
+        emitter.emitterShape = .point
+        emitter.beginTime = CACurrentMediaTime()
+        emitter.emitterCells = [cell]
+        effects.layer?.addSublayer(emitter)
+        Task {
+            try? await Task.sleep(for: .milliseconds(80))
+            emitter.birthRate = 0
+            try? await Task.sleep(for: .seconds(1))
+            emitter.removeFromSuperlayer()
+        }
     }
 
     /// Writes one PNG per pose (plus "walk") into `dir`, cropped around the puppy, then quits.
@@ -105,6 +185,11 @@ final class PetOverlay {
         }
         NSApp.terminate(nil)
     }
+}
+
+/// A view that never takes clicks.
+final class ClickThroughView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// Shows the pet menu on click.
