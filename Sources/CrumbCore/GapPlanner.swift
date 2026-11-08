@@ -17,12 +17,15 @@ public struct DesktopIcon: Sendable {
     public var kind: String  // file extension, lowercased
     public var date: Date  // date added
     public var cell: Cell
-    public init(id: String, name: String, kind: String, date: Date, cell: Cell) {
+    /// Sits exactly on its slot's centre. An off-centre icon is moved even when it's already in the right slot.
+    public var snug: Bool
+    public init(id: String, name: String, kind: String, date: Date, cell: Cell, snug: Bool = true) {
         self.id = id
         self.name = name
         self.kind = kind
         self.date = date
         self.cell = cell
+        self.snug = snug
     }
 }
 
@@ -43,7 +46,7 @@ public struct Move: Equatable, Sendable {
 
 /// Pack icons into the first slots with no gaps. `.off` keeps the current reading order;
 /// other modes sort first. Moves come in target-slot order, so in `.off` each target is already free.
-/// ponytail: sort modes, or off-grid icons snapped to the same cell, can briefly stack two icons mid-haul; add swap-aware ordering if it looks bad.
+/// ponytail: sort modes can briefly stack two icons mid-haul (the Hauler sends icons sharing a slot to the end); add swap-aware ordering if it looks bad.
 public func planMoves(_ icons: [DesktopIcon], rows: Int, sort: SortMode) -> [Move] {
     precondition(rows > 0, "grid needs at least one row")
     func slot(_ c: Cell) -> Int { c.col * rows + c.row }
@@ -59,6 +62,6 @@ public func planMoves(_ icons: [DesktopIcon], rows: Int, sort: SortMode) -> [Mov
         }
     return ordered.enumerated().compactMap { i, icon in
         let to = Cell(col: i / rows, row: i % rows)
-        return to == icon.cell ? nil : Move(id: icon.id, from: icon.cell, to: to)
+        return to == icon.cell && icon.snug ? nil : Move(id: icon.id, from: icon.cell, to: to)
     }
 }

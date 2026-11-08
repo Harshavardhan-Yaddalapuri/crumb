@@ -10,7 +10,7 @@ final class Hauler {
     /// Safety stop for one tidy, in case a plan never settles.
     static let maxHauls = 60
     private static func key(_ m: Move) -> String { "\(m.id)→\(m.to.col),\(m.to.row)" }
-    /// Planned as if past the last slot, so a loose icon always gets carried to its proper slot.
+    /// Planned as if past the last slot, so a loose icon (or one sharing a slot) always gets carried to a free slot.
     private static let outside = Cell(col: 100_000, row: 0)
 
     private let finder: FinderBridge
@@ -140,15 +140,28 @@ final class Hauler {
         let screen = CGRect(x: 0, y: 0, width: overlay.pet.map.width, height: overlay.pet.map.height)
         let names = Dictionary(grouping: found, by: \.name)
         let usable = found.filter { screen.contains($0.position) && names[$0.name]?.count == 1 }
-        return usable.map { item in
+        var icons = usable.map { item in
             // Finder shows ":" in file names as "/".
             let url = desktop.appendingPathComponent(item.name.replacingOccurrences(of: "/", with: ":"))
             let added = (try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate
+            let cell = grid.cell(nearest: item.position)
+            let center = grid.center(of: cell)
             let icon = DesktopIcon(
                 id: item.name, name: item.name, kind: url.pathExtension.lowercased(), date: added ?? .distantPast,
-                cell: loose.contains(item.name) ? Self.outside : grid.cell(nearest: item.position))
-            return (icon, item.position)
+                cell: loose.contains(item.name) ? Self.outside : cell,
+                snug: abs(item.position.x - center.x) <= 1 && abs(item.position.y - center.y) <= 1)
+            return (icon: icon, position: item.position)
         }
+        // Finder drops a new copy (File ▸ Duplicate) on top of or just beside another icon, in the same slot. The
+        // icon sitting snug in the slot keeps it (else the older one); the others are carried to the end.
+        for (cell, group) in Dictionary(grouping: icons.indices, by: { icons[$0].icon.cell })
+        where cell != Self.outside && group.count > 1 {
+            let keeper = group.min { a, b in
+                (icons[a].icon.snug ? 0 : 1, icons[a].icon.date) < (icons[b].icon.snug ? 0 : 1, icons[b].icon.date)
+            }
+            for i in group where i != keeper { icons[i].icon.cell = Self.outside }
+        }
+        return icons
     }
 
     /// Says what's wrong once (sad face, bubble) and checks again in a minute. Returns nil for `survey`.

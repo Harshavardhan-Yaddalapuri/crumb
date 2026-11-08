@@ -22,6 +22,11 @@ private func arrangement(_ icons: [DesktopIcon], rows: Int, _ sort: SortMode) ->
         planMoves(oneGap, rows: 3, sort: .off) == [Move(id: "D", from: Cell(col: 1, row: 0), to: Cell(col: 0, row: 2))],
         "closes a single gap with one move")
     #expect(planMoves([icon("A", 0, 0), icon("B", 0, 1)], rows: 3, sort: .off).isEmpty, "no gaps, no moves")
+    var offCentre = icon("B", 0, 1)
+    offCentre.snug = false
+    #expect(
+        planMoves([icon("A", 0, 0), offCentre], rows: 3, sort: .off) == [Move(id: "B", from: Cell(col: 0, row: 1), to: Cell(col: 0, row: 1))],
+        "an off-centre icon is nudged into its own slot")
 
     // Column 0: (gap), A, (gap)   Column 1: B, C
     let holes = [icon("A", 0, 1), icon("B", 1, 0), icon("C", 1, 1)]
