@@ -152,10 +152,11 @@ final class Hauler {
                 snug: abs(item.position.x - center.x) <= 1 && abs(item.position.y - center.y) <= 1)
             return (icon: icon, position: item.position)
         }
-        // Finder drops a new copy (File ▸ Duplicate) on top of or just beside another icon, in the same slot. The
-        // icon sitting snug in the slot keeps it (else the older one); the others are carried to the end.
+        // Finder drops a new copy (File ▸ Duplicate) on top of or just beside another icon, in the same slot. Unsorted,
+        // the icon sitting snug in the slot keeps it (else the older one); the others are carried to the end. Sorted,
+        // the sort already gives each its own slot, and marking one as outside would re-carry it forever.
         for (cell, group) in Dictionary(grouping: icons.indices, by: { icons[$0].icon.cell })
-        where cell != Self.outside && group.count > 1 {
+        where sort == .off && cell != Self.outside && group.count > 1 {
             let keeper = group.min { a, b in
                 (icons[a].icon.snug ? 0 : 1, icons[a].icon.date) < (icons[b].icon.snug ? 0 : 1, icons[b].icon.date)
             }
