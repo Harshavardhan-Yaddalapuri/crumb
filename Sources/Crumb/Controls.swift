@@ -1,4 +1,5 @@
 import AppKit
+import CrumbCore
 
 /// A speech bubble above the puppy: a short message and optional buttons. Always light, like a comic bubble.
 final class Bubble: NSView {
@@ -103,5 +104,38 @@ final class BellyMenu: NSMenu, NSMenuDelegate {
             item.isEnabled = !eater.isBusy
             addItem(item)
         }
+    }
+}
+
+/// The Settings submenu: which kinds of junk Crumb asks about, and forgetting the files it was told to keep.
+/// Rebuilt every time it opens so the checkmarks and count are current.
+final class SettingsMenu: NSMenu, NSMenuDelegate {
+    private let eater: Eater
+
+    init(eater: Eater) {
+        self.eater = eater
+        super.init(title: "Settings")
+        autoenablesItems = false
+        delegate = self
+    }
+
+    required init(coder: NSCoder) { fatalError("not used") }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        removeAllItems()
+        let header = NSMenuItem(title: "Ask about", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        addItem(header)
+        for reason in JunkReason.allCases {
+            let on = eater.asks(about: reason)
+            let title = reason.plural.prefix(1).uppercased() + reason.plural.dropFirst()
+            addItem(ActionItem(title, checked: on) { [eater] in eater.setAsks(!on, about: reason) })
+        }
+        addItem(.separator())
+        let kept = eater.keptCount
+        let forget = ActionItem(kept == 1 ? "Forget 1 kept file" : "Forget \(kept) kept files") { [eater] in eater.forgetKept() }
+        forget.isEnabled = kept > 0
+        forget.toolTip = "Files you chose to keep, or had Crumb spit out, will be asked about again."
+        addItem(forget)
     }
 }

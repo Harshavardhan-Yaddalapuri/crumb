@@ -14,9 +14,11 @@ final class Eater {
     let belly: Belly
     /// A sniff/ask/eat job is running.
     private(set) var isBusy = false
-    /// Stuffed and asleep until a slot frees.
+    /// Asleep: stuffed (until a slot frees) or resting after "Nap for 1h".
     private(set) var napping = false
-    /// Called when the belly changes, so the menu can follow.
+    /// When a "Nap for 1h" rest ends; nil when not resting.
+    private(set) var restUntil: Date?
+    /// Called when the belly or the rest changes, so the menu can follow.
     var onChange: () -> Void = {}
 
     private let overlay: PetOverlay
@@ -28,6 +30,7 @@ final class Eater {
     private var burpTimer: Task<Void, Never>?
     private var lastBurpAttempt = Date.distantPast
     private var loop: Task<Void, Never>?
+    private var restTimer: Task<Void, Never>?
     private var pet: Pet { overlay.pet }
 
     init(belly: Belly, overlay: PetOverlay, finder: FinderBridge, hauler: Hauler) {
@@ -53,6 +56,7 @@ final class Eater {
     /// "Clean up now": ask about one file after another, ignoring the 15-minute gap, until the belly is full or
     /// nothing is left.
     func cleanUpNow() {
+        if restUntil != nil { wakeUp() }
         guard !belly.isFull else {
             overlay.say("I'm stuffed! Give me a few minutes to digest.", hideAfter: .seconds(4))
             return
@@ -79,7 +83,10 @@ final class Eater {
             isBusy = false
             hauler.paused = napping
         }
-        if napping { wake() }
+        if napping {
+            endRest()
+            wake()
+        }
         let name = Self.name(entry)
         let size = FinderBridge.layout().iconSize
         let picture = await IconPicture.load(URL(fileURLWithPath: entry.location), size: size)
@@ -134,6 +141,18 @@ final class Eater {
     // MARK: - Asking
 
     /// Kept files, as `Scanner.keepKey`s.
+    // MARK: - Settings
+
+    func asks(about reason: JunkReason) -> Bool { !disabledRules.contains(reason.rawValue) }
+
+    func setAsks(_ on: Bool, about reason: JunkReason) {
+        if on { disabledRules.remove(reason.rawValue) } else { disabledRules.insert(reason.rawValue) }
+    }
+
+    /// Files answered Keep, and spat-out files: never asked about again until forgotten.
+    var keptCount: Int { neverAsk.count }
+    func forgetKept() { neverAsk = [] }
+
     private var neverAsk: Set<String> {
         get { Set(defaults.stringArray(forKey: "neverAsk") ?? []) }
         set { defaults.set(newValue.sorted(), forKey: "neverAsk") }
@@ -148,7 +167,8 @@ final class Eater {
 
     private func lookForJunk() async {
         guard !isBusy, !hauler.isBusy, !hauler.isComplaining, !pet.onJob, NSEvent.pressedMouseButtons == 0,
-            policy.mayAsk(now: .now, bellyFull: belly.isFull, napping: napping)
+            policy.mayAsk(now: .now, bellyFull: belly.isFull, napping: napping || restUntil != nil),
+            !Self.fullScreenAppInFront()
         else { return }
         isBusy = true
         hauler.paused = true
@@ -315,8 +335,40 @@ final class Eater {
         }
     }
 
+    /// "Nap for 1h": once the current job is done, sleep for an hour. No asks; tidies wait; burps still happen.
+    func napForAnHour() {
+        restUntil = .now + 3600
+        restTimer?.cancel()
+        restTimer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3600))
+            if !Task.isCancelled { self?.wakeUp() }
+        }
+        onChange()
+        Task {
+            await whenIdle()
+            if restUntil != nil { fallAsleep() }
+        }
+    }
+
+    /// Ends a "Nap for 1h" rest. A stuffed Crumb sleeps on until a slot frees.
+    func wakeUp() {
+        endRest()
+        if napping, !belly.isFull { wake() }
+    }
+
+    private func endRest() {
+        restTimer?.cancel()
+        restUntil = nil
+        onChange()
+    }
+
     private func startNap() {
-        guard belly.isFull, !napping else { return }
+        guard belly.isFull else { return }
+        fallAsleep()
+    }
+
+    private func fallAsleep() {
+        guard !napping else { return }
         napping = true
         hauler.paused = true  // tidies wait until it wakes
         pet.digestNap(true)
@@ -336,7 +388,7 @@ final class Eater {
         pet.fullness = belly.digesting.count
         onChange()
         scheduleBurp()
-        if napping, !belly.isFull { wake() }
+        if napping, !belly.isFull, restUntil == nil { wake() }
     }
 
     private func scheduleBurp() {
@@ -348,6 +400,22 @@ final class Eater {
             guard !Task.isCancelled, let self else { return }
             burpTimer = nil  // so rescheduling inside burp() doesn't cancel this task mid-burp
             await burp()
+        }
+    }
+
+    /// A full-screen app is in front: one of its normal windows covers the whole main display (Crumb's screen).
+    /// Window bounds need no permission; titles would need Screen Recording and aren't read.
+    static func fullScreenAppInFront() -> Bool {
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+            let screen = NSScreen.screens.first?.frame.size
+        else { return false }
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] ?? []
+        return windows.contains { w in
+            guard (w[kCGWindowOwnerPID as String] as? pid_t) == pid, (w[kCGWindowLayer as String] as? Int) == 0,
+                let b = w[kCGWindowBounds as String], let bounds = CGRect(dictionaryRepresentation: b as! CFDictionary)
+            else { return false }
+            return bounds == CGRect(origin: .zero, size: screen)
         }
     }
 

@@ -9,6 +9,8 @@ Crumb is a small animated pet that lives on the macOS desktop and keeps it tidy.
 
 Inspiration: Tangerine for Mac (tangerineformac.com) — an offline, Shift-drag file converter. Borrowed principles: lives where your hands already are, one sharp job, fully local, Mac-native.
 
+Scope now: the Desktop. Downloads (scanning and Burrow) is deferred until the Desktop is finished (decided 2026-11-08).
+
 Platform: macOS only, native Swift. Distributed outside the Mac App Store (needs Apple Events to Finder).
 
 ## Goals
@@ -38,7 +40,7 @@ Art and animation: jointed 3D puppet rendered with RealityKit through an orthogr
 | Digest nap | Belly reaches 5/5 (after hauling to close the last gap) | Curls up, "zzz"; wakes as soon as a slot frees |
 | Burp | A file's own 15-min digest timer ends | Small burp, belly shrinks one step; that file moves to Trash at this moment |
 | Spit out | Undo (click sleeping pet → "Spit it out", or from Belly history) | Crumb turns and coughs the file up: a same-size picture slides out of its mouth, the file goes back on the Desktop (from the belly or the Trash) with its real icon moved in under the picture, then Crumb carries it to a free slot; a spat-out file is never asked about again (kept files are remembered by path, size and modified time, so a new file with the same name is still checked) |
-| Burrow | Stale file found in Downloads | Hops into Dock's Downloads stack, pops out dragging the file, then Sniff → Ask on the desktop |
+| Burrow (deferred) | Stale file found in Downloads | Hops into Dock's Downloads stack, pops out dragging the file, then Sniff → Ask on the desktop |
 | Shrug | A job fails or is skipped | Shrug animation, optional short bubble |
 | Sad | Finder automation permission missing | Sad face, bubble "I need permission to tidy" with button to System Settings |
 
@@ -56,11 +58,12 @@ Bite holes: drawn in code (`biteHoles`), any count 1–10; bite k leaves round b
 Anti-annoyance rules:
 - At most one Ask per 15 minutes while wandering.
 - "Clean up now" bypasses that limit and Asks back-to-back until the belly is 5/5 or no candidates remain; then it naps.
-- Silent while a full-screen app is frontmost (Focus status is only available to apps with a special Apple entitlement, so Focus isn't detected).
+- Silent while a full-screen app is frontmost: no Asks while the frontmost app has a window covering the whole main display (window sizes need no permission; titles would need Screen Recording and aren't read). Tidies still run; the pet is hidden behind the app. Focus status is only available to apps with a special Apple entitlement, so Focus isn't detected.
+- Nap for 1h: once the current job is done Crumb sleeps for an hour: no Asks, tidies wait, burps still happen. "Wake up" ends it early, as do Clean up now and Spit out; a stuffed Crumb sleeps on until a slot frees. Not kept across relaunch.
 - No Asks during Digest nap; new haul/arrange jobs queue until it wakes.
 - **Keep** = never ask about that file again.
 
-Pet menu (click pet): Clean up now · Sort by ▸ (Kind / Date / Name / Off) · Belly (history + undo) · Nap for 1h · Settings.
+Pet menu (click pet): Clean up now · Belly (history + undo) · Sort by ▸ (Kind / Date / Name / Off) · Nap for 1h (Wake up while resting) · Settings ▸ (Ask about: one checkbox per junk rule · Forget N kept files, so Keep answers and spat-out files are asked about again). Settings is a submenu, not a window: Crumb has no Dock icon or app menu.
 
 ## 2. Junk detection
 
@@ -114,7 +117,7 @@ Undo:
 ### Permissions
 
 - Automation (Finder): requested on first launch.
-- Downloads folder access: requested when Burrow is first enabled.
+- Downloads folder access: requested when Burrow is first enabled (deferred with Downloads).
 
 ### Risk and spike
 

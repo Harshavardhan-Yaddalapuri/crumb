@@ -56,6 +56,7 @@ extension AppDelegate {
             let belly = try Belly(directory: support.appendingPathComponent("Crumb/Belly"))
             let eater = Eater(belly: belly, overlay: overlay, finder: finder, hauler: hauler)
             self.eater = eater
+            eater.onChange = { [weak self] in self?.buildMenu() }
             eater.start()
         } catch {
             NSLog("Crumb: can't open the belly, so no eating: \(error)")
@@ -82,6 +83,15 @@ extension AppDelegate {
             menu.addItem(bellyItem)
         }
         menu.addItem(sortItem)
+        if let eater {
+            menu.addItem(
+                eater.restUntil == nil
+                    ? ActionItem("Nap for 1h") { eater.napForAnHour() }
+                    : ActionItem("Wake up") { eater.wakeUp() })
+            let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+            settingsItem.submenu = SettingsMenu(eater: eater)
+            menu.addItem(settingsItem)
+        }
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Crumb", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         overlay.view.menu = menu
