@@ -2,6 +2,8 @@
 
 A little 3D puppy that lives at the bottom of your Mac's screen and keeps your Desktop tidy.
 
+<p align="center"><img src="docs/demo.gif" alt="Crumb carrying a duplicated file into place, asking to eat it, spitting it back out, and taking a nap" width="540"></p>
+
 - **Tidies:** when a gap opens between your Desktop icons, Crumb walks over, picks the icon up in its mouth and
   carries it into place. It can also keep the Desktop sorted by name, kind or date.
 - **Eats junk, but only if you say yes:** old screenshots, installers you've already installed, duplicate copies,
@@ -87,5 +89,5 @@ The project layout:
 | `Sources/Crumb` | The app: the overlay window and 3D puppy, Finder automation, tidying, eating and menus |
 | `art/` | The puppy model (`crumb.usdz`) and the Blender script that builds it |
 | `install.sh` | The one-line installer and uninstaller |
-| `docs/` | The design spec and the implementation plans |
+| `docs/` | The design spec, the implementation plans and the demo GIF |
 | `spike/` | The early experiment that showed Finder icon moves are reliable |
