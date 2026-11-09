@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build build/Crumb.app from the Swift package and sign it ad hoc.
+# Build build/Crumb.app from the Swift package and sign it ad hoc with the Hardened Runtime.
 #   scripts/make-app.sh            # debug build for this Mac, for development
 #   scripts/make-app.sh release    # optimised universal build (Apple Silicon + Intel), zipped for sharing
 set -euo pipefail
@@ -15,7 +15,8 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin/Crumb" "$app/Contents/MacOS/Crumb"
 cp art/crumb.usdz "$app/Contents/Resources/"
 cp scripts/Info.plist "$app/Contents/Info.plist"
-codesign --force --sign - "$app"
+# Hardened Runtime: other processes can't inject code into Crumb to borrow its Finder permission.
+codesign --force --options runtime --entitlements scripts/Crumb.entitlements --sign - "$app"
 if [ "$config" = release ]; then
     zip=build/Crumb.zip  # fixed name: install.sh downloads releases/latest/download/Crumb.zip
     rm -f "$zip"

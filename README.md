@@ -52,6 +52,11 @@ It only looks at your Desktop folder.
 
 Eaten files wait in `~/Library/Application Support/Crumb/Belly` until they go to the Trash.
 
+Crumb is built with Apple's **Hardened Runtime**, so other software on your Mac can't inject code into it to borrow
+its Finder permission. Its only exception is sending Apple Events to Finder. File names travel to Finder as data,
+never as script text, so a strangely named file can't run commands. The installer downloads over HTTPS only and
+refuses a zip whose app is tampered with, isn't Crumb, or isn't hardened.
+
 ## Good to know
 
 - Crumb works with Finder's standard Desktop icon size and spacing (View ▸ Show View Options: icon size 64, grid

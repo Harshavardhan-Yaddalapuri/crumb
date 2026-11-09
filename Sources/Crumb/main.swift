@@ -13,15 +13,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ note: Notification) {
         Task {
             do {
-                // Inside Crumb.app the model is a bundle resource; `swift run Crumb` from the repo root finds it in art/.
-                let url = Bundle.main.url(forResource: "crumb", withExtension: "usdz")
-                    ?? URL(fileURLWithPath: "art/crumb.usdz")
+                // Inside Crumb.app the model is a bundle resource. Debug builds run outside the app (`swift run Crumb`
+                // from the repo root) also look in art/; release builds never load a model from the current folder.
+                var url = Bundle.main.url(forResource: "crumb", withExtension: "usdz")
+                #if DEBUG
+                    url = url ?? URL(fileURLWithPath: "art/crumb.usdz")
+                #endif
+                guard let url else { throw CocoaError(.fileNoSuchFile) }
                 let overlay = try PetOverlay(screen: NSScreen.screens[0], model: try await Entity(contentsOf: url))  // the menu-bar display; NSScreen.main follows keyboard focus
                 self.overlay = overlay
-                if let dir = ProcessInfo.processInfo.environment["CRUMB_SNAPSHOT"] {
-                    try await overlay.snapshotPoses(to: URL(fileURLWithPath: dir))
-                    return
-                }
+                #if DEBUG  // development only (scripts/snapshot-poses.sh): render each pose to PNGs and quit
+                    if let dir = ProcessInfo.processInfo.environment["CRUMB_SNAPSHOT"] {
+                        try await overlay.snapshotPoses(to: URL(fileURLWithPath: dir))
+                        return
+                    }
+                #endif
                 let finder = FinderBridge()
                 let hauler = Hauler(finder: finder, overlay: overlay)
                 self.hauler = hauler

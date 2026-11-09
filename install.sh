@@ -32,11 +32,19 @@ install() {
         cp "$CRUMB_ZIP" "$tmp/Crumb.zip"
     else
         say "Downloading Crumb…"
-        curl -fL --progress-bar -o "$tmp/Crumb.zip" "https://github.com/$repo/releases/latest/download/Crumb.zip" \
+        # HTTPS only, also across GitHub's redirect to its download server.
+        curl -fL --proto '=https' --tlsv1.2 --progress-bar -o "$tmp/Crumb.zip" \
+            "https://github.com/$repo/releases/latest/download/Crumb.zip" \
             || fail "couldn't download Crumb from github.com/$repo/releases."
     fi
     ditto -x -k "$tmp/Crumb.zip" "$tmp" || fail "the download isn't a valid zip."
     [ -d "$tmp/Crumb.app" ] || fail "the zip doesn't contain Crumb.app."
+    # Refuse anything that isn't an intact, unmodified Crumb build with the Hardened Runtime.
+    codesign --verify --strict --deep "$tmp/Crumb.app" 2>/dev/null || fail "Crumb.app's signature is broken; not installing."
+    [ "$(defaults read "$tmp/Crumb.app/Contents/Info" CFBundleIdentifier 2>/dev/null)" = "$bundle" ] \
+        || fail "the zip doesn't contain Crumb; not installing."
+    sig=$(codesign -dv "$tmp/Crumb.app" 2>&1 || true)
+    [[ "$sig" == *"flags="*"runtime"* ]] || fail "Crumb.app isn't hardened; not installing."
 
     quit_crumb
     rm -rf "$app"
