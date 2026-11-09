@@ -121,19 +121,14 @@ final class Eater {
         overlay.say("Here's “\(name)” back. I won't ask about it again.", hideAfter: .seconds(4))
         pet.goal = .stand
         hauler.tidy(carrying: finderName)  // starts as this job ends: picks it up where it lies
-        if belly.isFull {
-            Task {
-                await whenIdle()
-                startNap()
-            }
-        }
+        if belly.isFull { settleDown() }
     }
 
     private func failSpit(_ text: String) {
         overlay.hideMeal()
         overlay.say(text, hideAfter: .seconds(4))
         pet.goHome()
-        if belly.isFull { startNap() }
+        if belly.isFull { settleDown() }
     }
 
     static func name(_ entry: BellyEntry) -> String { (entry.originalPath as NSString).lastPathComponent }
@@ -296,10 +291,7 @@ final class Eater {
         hauler.tidy()  // runs once this job ends
         if belly.isFull {
             policy.cleaningUp = false
-            Task {
-                await whenIdle()  // close the last gap, then sleep
-                startNap()
-            }
+            settleDown()  // close the last gap, walk home, then sleep
         }
     }
 
@@ -344,10 +336,7 @@ final class Eater {
             if !Task.isCancelled { self?.wakeUp() }
         }
         onChange()
-        Task {
-            await whenIdle()
-            if restUntil != nil { fallAsleep() }
-        }
+        settleDown()
     }
 
     /// Ends a "Nap for 1h" rest. A stuffed Crumb sleeps on until a slot frees.
@@ -362,13 +351,19 @@ final class Eater {
         onChange()
     }
 
-    private func startNap() {
-        guard belly.isFull else { return }
-        fallAsleep()
+    /// Sleeps once nothing is running and it's back home (not mid-walk), if it still should by then:
+    /// resting ("Nap for 1h") or stuffed.
+    private func settleDown() {
+        Task {
+            while isBusy || hauler.isBusy || pet.onJob || pet.gait.isWalking {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            guard !napping, restUntil != nil || belly.isFull else { return }
+            fallAsleep()
+        }
     }
 
     private func fallAsleep() {
-        guard !napping else { return }
         napping = true
         hauler.paused = true  // tidies wait until it wakes
         pet.digestNap(true)
