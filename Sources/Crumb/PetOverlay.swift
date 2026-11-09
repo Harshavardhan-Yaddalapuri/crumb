@@ -172,8 +172,8 @@ final class PetOverlay {
         cell.emissionLongitude = .pi / 2  // up: layer coordinates point up
         cell.emissionRange = 0.25
         cell.xAcceleration = 5  // drift right as it rises
-        cell.scale = 0.22
-        cell.scaleSpeed = 0.09
+        cell.scale = 0.3
+        cell.scaleSpeed = 0.12
         cell.spin = -0.15
         cell.spinRange = 0.2
         cell.alphaSpeed = -0.28
