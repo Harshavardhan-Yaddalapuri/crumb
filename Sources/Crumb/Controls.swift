@@ -73,8 +73,9 @@ final class ActionItem: NSMenuItem {
     @objc private func fire() { run() }
 }
 
-/// The Belly submenu: what Crumb has eaten, newest first, each with Spit out. Rebuilt every time it opens so
-/// the minutes stay current.
+/// The Belly submenu, newest first, in two sections: files still digesting (Spit out puts them back) and recent
+/// ones already burped into the Trash (Spit out still works until the Trash is emptied). Rebuilt every time it
+/// opens so the minutes stay current.
 @MainActor
 final class BellyMenu: NSMenu, NSMenuDelegate {
     static let shown = 20
@@ -92,16 +93,30 @@ final class BellyMenu: NSMenu, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         removeAllItems()
         let entries = eater.belly.history.suffix(Self.shown).reversed()
+        section("Digesting", empty: "Nothing right now", entries.filter { !$0.burped }) { e in
+            let minutes = max(1, Int((e.digestEndsAt.timeIntervalSinceNow / 60).rounded(.up)))
+            return "Spit out “\(Eater.name(e))” (Trash in \(minutes) min)"
+        }
+        addItem(.separator())
+        section("Recently eaten (in the Trash)", empty: "Nothing yet", entries.filter(\.burped)) { e in
+            "Spit out “\(Eater.name(e))”"
+        }
+    }
+
+    private func section(_ title: String, empty: String, _ entries: [BellyEntry], label: (BellyEntry) -> String) {
+        let header = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        addItem(header)
         if entries.isEmpty {
-            let empty = NSMenuItem(title: "Empty", action: nil, keyEquivalent: "")
-            empty.isEnabled = false
-            addItem(empty)
+            let none = NSMenuItem(title: empty, action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            none.indentationLevel = 1
+            addItem(none)
         }
         for e in entries {
-            let minutes = max(1, Int((e.digestEndsAt.timeIntervalSinceNow / 60).rounded(.up)))
-            let when = e.burped ? "in the Trash" : "burps in \(minutes) min"
-            let item = ActionItem("Spit out “\(Eater.name(e))” (\(when))") { [eater] in eater.spitOut(e.id) }
+            let item = ActionItem(label(e)) { [eater] in eater.spitOut(e.id) }
             item.isEnabled = !eater.isBusy
+            item.indentationLevel = 1
             addItem(item)
         }
     }
