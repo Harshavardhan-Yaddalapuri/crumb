@@ -20,6 +20,8 @@ final class PetOverlay {
     /// Holds the crumb bursts, above meals and below bubbles.
     private let effects = ClickThroughView()
     private var meal: (view: MealView, center: CGPoint, size: Double, mirrored: Bool)?
+    /// Z's drifting up from the head while the puppy sleeps.
+    private let snores = CAEmitterLayer()
 
     init(screen: NSScreen, model: Entity) throws {
         let size = screen.frame.size
@@ -41,6 +43,11 @@ final class PetOverlay {
         effects.frame = view.bounds
         effects.wantsLayer = true
         view.addSubview(effects)
+        snores.frame = effects.bounds
+        snores.emitterShape = .point
+        snores.birthRate = 0
+        snores.emitterCells = [Self.snoreCell]
+        effects.layer?.addSublayer(snores)
 
         let anchor = AnchorEntity(world: .zero)
         view.scene.addAnchor(anchor)
@@ -69,6 +76,10 @@ final class PetOverlay {
         pet.update(dt: dt)
         // The bubble rides above the puppy's head. Views use AppKit's y-up coordinates; the pet's frame is top-left.
         if let bubble { place(bubble) }
+        // Just above the right side of the sleeping head (it faces the viewer when still).
+        let f = pet.frame
+        snores.emitterPosition = CGPoint(x: f.midX + f.width * 0.2, y: view.bounds.height - (f.minY + f.height * 0.2))
+        snores.birthRate = pet.isAsleep ? 1 : 0
         // Take clicks only while the mouse is over the puppy or its bubble.
         let mouse = NSEvent.mouseLocation
         let topLeft = CGPoint(x: mouse.x - window.frame.minX, y: window.frame.maxY - mouse.y)
@@ -140,6 +151,34 @@ final class PetOverlay {
         meal?.view.removeFromSuperview()
         meal = nil
     }
+
+    /// One "z" every ~1.4 s: rises and sways right, grows, fades out over 3.5 s.
+    private static let snoreCell: CAEmitterCell = {
+        let font = NSFont.systemFont(ofSize: 44, weight: .heavy)  // drawn at 2x, shown at half: sharp on Retina
+        let text = NSAttributedString(string: "z", attributes: [
+            .font: font, .foregroundColor: NSColor.white,
+            .strokeColor: NSColor(calibratedWhite: 0.15, alpha: 0.9), .strokeWidth: -4,  // outlined: readable on any wallpaper
+        ])
+        let size = text.size()
+        let image = NSImage(size: NSSize(width: ceil(size.width) + 8, height: ceil(size.height) + 8), flipped: false) { _ in
+            text.draw(at: NSPoint(x: 4, y: 4))
+            return true
+        }
+        let cell = CAEmitterCell()
+        cell.contents = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        cell.birthRate = 0.7
+        cell.lifetime = 3.5
+        cell.velocity = 16
+        cell.emissionLongitude = .pi / 2  // up: layer coordinates point up
+        cell.emissionRange = 0.25
+        cell.xAcceleration = 5  // drift right as it rises
+        cell.scale = 0.22
+        cell.scaleSpeed = 0.09
+        cell.spin = -0.15
+        cell.spinRange = 0.2
+        cell.alphaSpeed = -0.28
+        return cell
+    }()
 
     private static let crumb: CGImage = {
         let dot = NSImage(size: NSSize(width: 6, height: 6), flipped: false) { r in

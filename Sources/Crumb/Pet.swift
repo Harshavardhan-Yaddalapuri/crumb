@@ -34,6 +34,10 @@ final class Pet {
     private var look: Float = 0, lookTarget: Float = 0, nextLook = 3.0
     private var wag: Float = 0, wagUntil = 0.0, nextWag = 4.0
     private var bellyShown: Float = 0
+    private var breathPhase = 0.0, deepSleep = 0.0
+
+    /// Curled up asleep (a digest nap, Nap for 1h, or an idle nap) and not still walking there.
+    var isAsleep: Bool { goal == .sleep && !gait.isWalking }
 
     /// Spec: naps after 10 min with nothing to do.
     static let napAfter = 600.0
@@ -83,6 +87,9 @@ final class Pet {
         yaw += ((gait.isWalking || onJob ? Float(gait.facing) * 0.6 : 0) - yaw) * ease(8)
         stepAmount += ((gait.isWalking ? 0.45 : 0) - stepAmount) * ease(10)
         bellyShown += (Self.bellyPerFile * Float(fullness) - bellyShown) * ease(3)
+        // Asleep it breathes slower and deeper; eased so the change isn't a jump.
+        deepSleep += ((isAsleep ? 1 : 0) - deepSleep) * Double(ease(1.5))
+        breathPhase += dt * (2.2 - 1.1 * deepSleep)
         ears.step(toward: gait.isWalking ? 0.35 : 0, dt: dt)
 
         var shown = pose
@@ -96,7 +103,7 @@ final class Pet {
             swing: stepAmount * sin(Float(gait.phase) * 2 * .pi),
             yaw: yaw,
             ears: ears.value,
-            breath: 0.015 * sin(Float(clock) * 2.2),
+            breath: Float(0.015 + 0.02 * deepSleep) * sin(Float(breathPhase)),
             belly: bellyShown)
         let feet = map.world(CGPoint(x: gait.position.x, y: gait.position.y))
         rig.entity.position = SIMD3(feet.x, feet.y, 0)

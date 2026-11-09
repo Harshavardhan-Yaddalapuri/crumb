@@ -367,13 +367,11 @@ final class Eater {
         napping = true
         hauler.paused = true  // tidies wait until it wakes
         pet.digestNap(true)
-        overlay.say("zzz")
     }
 
     private func wake() {
         napping = false
         pet.digestNap(false)
-        overlay.say(nil)
         hauler.paused = isBusy
     }
 
