@@ -16,15 +16,33 @@ Click the puppy for its menu: Clean up now, Belly, Sort by, Nap for 1h, Settings
 
 ## Install
 
-1. Download `Crumb-x.y.zip` from the [Releases](../../releases) page and double-click it to unzip.
-2. Drag **Crumb.app** into your **Applications** folder.
-3. Open it. Crumb isn't signed with an Apple Developer ID yet, so the first time macOS says it can't verify the app.
-   Open **System Settings ▸ Privacy & Security**, scroll down and click **Open Anyway** next to Crumb.
-4. When macOS asks whether Crumb may control **Finder**, click **Allow**. Crumb moves icons by asking Finder to do it.
+Paste this into Terminal:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Harshavardhan-Yaddalapuri/crumb/master/install.sh | bash
+```
+
+It downloads the latest release into **Applications** and starts Crumb. Run it again later to update. When macOS asks
+whether Crumb may control **Finder**, click **Allow**: Crumb moves icons by asking Finder to do it.
 
 Crumb has no Dock icon. To quit, click the puppy and choose **Quit Crumb**.
 
 **Needs:** macOS 15 or later, on Apple Silicon or Intel.
+
+### Uninstall
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Harshavardhan-Yaddalapuri/crumb/master/install.sh | bash -s -- uninstall
+```
+
+This quits Crumb and removes the app, its data and settings, and its Finder permission. Any files still in its belly
+go to the Trash first, so nothing is lost.
+
+### Manual install
+
+Download `Crumb.zip` from [Releases](../../releases), unzip it and drag **Crumb.app** into Applications. Crumb isn't
+signed with an Apple Developer ID yet, so the first time macOS says it can't verify the app: open **System Settings ▸
+Privacy & Security** and click **Open Anyway** next to Crumb.
 
 ## Privacy and permissions
 
@@ -43,15 +61,6 @@ Eaten files wait in `~/Library/Application Support/Crumb/Belly` until they go to
 - Files with a Finder tag are never asked about.
 - It only uses the main display.
 
-## Uninstall
-
-Quit Crumb, delete Crumb.app, then remove its data and settings:
-
-```sh
-rm -rf ~/Library/Application\ Support/Crumb
-defaults delete dev.crumb.Crumb
-```
-
 ## Build from source
 
 Needs Xcode 16 or later.
@@ -60,7 +69,7 @@ Needs Xcode 16 or later.
 swift test                      # run the tests
 scripts/make-app.sh             # debug build: build/Crumb.app
 open build/Crumb.app
-scripts/make-app.sh release     # universal build plus build/Crumb-<version>.zip for a release
+scripts/make-app.sh release     # universal build plus build/Crumb.zip to attach to a GitHub release
 ```
 
 Each rebuild changes the app's signature, so macOS asks for Finder permission again.
@@ -72,5 +81,6 @@ The project layout:
 | `Sources/CrumbCore` | Pure logic with tests: the icon grid, gap and sort planning, junk rules, the belly ledger, walking and poses |
 | `Sources/Crumb` | The app: the overlay window and 3D puppy, Finder automation, tidying, eating and menus |
 | `art/` | The puppy model (`crumb.usdz`) and the Blender script that builds it |
+| `install.sh` | The one-line installer and uninstaller |
 | `docs/` | The design spec and the implementation plans |
 | `spike/` | The early experiment that showed Finder icon moves are reliable |

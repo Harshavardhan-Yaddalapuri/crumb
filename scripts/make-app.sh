@@ -17,8 +17,7 @@ cp art/crumb.usdz "$app/Contents/Resources/"
 cp scripts/Info.plist "$app/Contents/Info.plist"
 codesign --force --sign - "$app"
 if [ "$config" = release ]; then
-    version=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" scripts/Info.plist)
-    zip=build/Crumb-$version.zip
+    zip=build/Crumb.zip  # fixed name: install.sh downloads releases/latest/download/Crumb.zip
     rm -f "$zip"
     ditto -c -k --keepParent "$app" "$zip"  # ditto keeps the signature and bundle metadata intact
     echo "$zip"
