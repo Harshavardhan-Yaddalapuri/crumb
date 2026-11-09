@@ -173,7 +173,7 @@ final class Pet {
         shown.tail += wag * sin(Float(clock) * 14)
     }
 
-    // ponytail: weighted random idle choices; PetBrain (Plan 3) interrupts these with real jobs.
+    // ponytail: weighted random idle choices; jobs (tidying, eating) take over through walk(toHold:) and hand back with goHome().
     private func wander() {
         if goal == .sleep { awakeSince = clock }  // just woke up
         if clock - awakeSince >= Self.napAfter {

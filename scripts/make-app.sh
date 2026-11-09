@@ -1,12 +1,14 @@
 #!/bin/bash
 # Build build/Crumb.app from the Swift package and sign it ad hoc.
-#   scripts/make-app.sh            # debug build
-#   scripts/make-app.sh release
+#   scripts/make-app.sh            # debug build for this Mac, for development
+#   scripts/make-app.sh release    # optimised universal build (Apple Silicon + Intel), zipped for sharing
 set -euo pipefail
 cd "$(dirname "$0")/.."
 config=${1:-debug}
-swift build -c "$config" --product Crumb
-bin=$(swift build -c "$config" --show-bin-path)
+arch=()
+[ "$config" = release ] && arch=(--arch arm64 --arch x86_64)
+swift build -c "$config" ${arch[@]+"${arch[@]}"} --product Crumb
+bin=$(swift build -c "$config" ${arch[@]+"${arch[@]}"} --show-bin-path)
 app=build/Crumb.app
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
@@ -14,4 +16,11 @@ cp "$bin/Crumb" "$app/Contents/MacOS/Crumb"
 cp art/crumb.usdz "$app/Contents/Resources/"
 cp scripts/Info.plist "$app/Contents/Info.plist"
 codesign --force --sign - "$app"
+if [ "$config" = release ]; then
+    version=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" scripts/Info.plist)
+    zip=build/Crumb-$version.zip
+    rm -f "$zip"
+    ditto -c -k --keepParent "$app" "$zip"  # ditto keeps the signature and bundle metadata intact
+    echo "$zip"
+fi
 echo "$app"
