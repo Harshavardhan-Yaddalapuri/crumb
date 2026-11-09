@@ -2,7 +2,7 @@
 
 A little 3D puppy that lives at the bottom of your Mac's screen and keeps your Desktop tidy.
 
-<p align="center"><img src="docs/demo.gif" alt="Crumb carrying a duplicated file into place, asking to eat it, spitting it back out, and taking a nap" width="540"></p>
+<p align="center"><img src="https://github.com/user-attachments/assets/b0750ceb-ac1c-4d99-bcf1-bfea16af4f64" alt="Crumb carrying a duplicated file into place, asking to eat it, spitting it back out, and taking a nap" width="540"></p>
 
 - **Tidies:** when a gap opens between your Desktop icons, Crumb walks over, picks the icon up in its mouth and
   carries it into place. It can also keep the Desktop sorted by name, kind or date.
